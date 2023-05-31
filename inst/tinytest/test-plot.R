@@ -1,25 +1,17 @@
-exit_file("tinyviztest")
 source("helpers.R")
-using("tinyviztest")
+using("marginaleffects")
+if (!requiet("tinysnapshot")) exit_file("tinysnapshot")
+using("tinysnapshot")
 
-# basic plot.marginaleffects()
+# from marginaleffects objects
 mod <- glm(am ~ hp + wt, data = mtcars)
-mfx <- marginaleffects(mod)
-p <- plot(mfx)
-expect_vdiff(p, "plot marginaleffects")
+
+expect_error(plot(predictions(mod)), pattern = "plot_predictions")
+expect_error(plot(slopes(mod)), pattern = "plot_slopes")
+expect_error(plot(comparisons(mod)), pattern = "plot_comparisons")
 
 
-# plot(mfx): no CI
-mod <- glm(am ~ hp + wt, data = mtcars)
-mfx <- marginaleffects(mod, vcov = FALSE)
-p <- plot(mfx)
-expect_vdiff(p, "plot marginaleffects no CI")
 
 
-# bugfix: contrasts overlap
-dat <- mtcars
-dat$cyl <- factor(dat$cyl)
-mod <- lm(mpg ~ hp + cyl, data = dat)
-mfx <- marginaleffects(mod)
-p <- plot(mfx)
-expect_vdiff(p, "plot contrast overlap bug fix")
+source("helpers.R")
+rm(list = ls())

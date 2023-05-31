@@ -1,3 +1,4 @@
+# This function takes any input from the `hypothesis` argument, builds a lincom matrix and then multiplies it by the estimates
 get_hypothesis <- function(x, hypothesis, column, by = NULL) {
 
     if (is.null(hypothesis)) {
@@ -9,12 +10,8 @@ get_hypothesis <- function(x, hypothesis, column, by = NULL) {
     # must be checked here when we know how many rows the output has
     if (isTRUE(hypothesis %in% c("pairwise", "reference", "sequential"))) {
         if (nrow(x) > 25) {
-            msg <- format_msg(
-            'The "pairwise", "reference", and "sequential" options of the `hypothesis`
-            argument are not supported for `marginaleffects` commands which generate more
-            than 25 rows of results. Use the `newdata`, `by`, and/or `variables` arguments
-            to compute a smaller set of results on which to conduct hypothesis tests.')
-            stop(msg, call. = FALSE)
+            msg <- 'The "pairwise", "reference", and "sequential" options of the `hypotheses` argument are not supported for `marginaleffects` commands which generate more than 25 rows of results. Use the `newdata`, `by`, and/or `variables` arguments to compute a smaller set of results on which to conduct hypothesis tests.'
+            insight::format_error(msg)
         }
     }
 
@@ -22,7 +19,7 @@ get_hypothesis <- function(x, hypothesis, column, by = NULL) {
         isTRUE(checkmate::check_atomic_vector(hypothesis))) {
         if (length(hypothesis) != nrow(x)) {
             msg <- sprintf(
-            "The `hypothesis` vector must be of length %s.", nrow(x))
+            "The `hypotheses` vector must be of length %s.", nrow(x))
             stop(msg, call. = FALSE)
         }
         lincom <- as.matrix(hypothesis)
@@ -32,7 +29,7 @@ get_hypothesis <- function(x, hypothesis, column, by = NULL) {
     if (isTRUE(checkmate::check_matrix(hypothesis))) {
         if (nrow(hypothesis) != nrow(x)) {
             msg <- sprintf(
-            "The `hypothesis` matrix must be have %s rows.", nrow(x))
+            "The `hypotheses` matrix must be have %s rows.", nrow(x))
             stop(msg, call. = FALSE)
         }
         lincom <- hypothesis
@@ -41,12 +38,25 @@ get_hypothesis <- function(x, hypothesis, column, by = NULL) {
         }
     }
 
+    if (isTRUE(hypothesis == "revreference")) {
+        lincom <- -1 * diag(nrow(x))
+        lincom[1, ] <- 1
+        lab <- get_hypothesis_row_labels(x, by = by)
+        if (length(lab) == 0 || anyDuplicated(lab) > 0) {
+            lab <- sprintf("Row 1 - Row %s", seq_len(ncol(lincom)))
+        } else {
+            lab <- sprintf("%s - %s", lab[1], lab)
+        }
+        colnames(lincom) <- lab
+        lincom <- lincom[, 2:ncol(lincom), drop = FALSE]
+    }
+
     if (isTRUE(hypothesis == "reference")) {
         lincom <- diag(nrow(x))
         lincom[1, ] <- -1
         lab <- get_hypothesis_row_labels(x, by = by)
         if (length(lab) == 0 || anyDuplicated(lab) > 0) {
-            lab <- sprintf("Row %s - Row 1", 1:ncol(lincom))
+            lab <- sprintf("Row %s - Row 1", seq_len(ncol(lincom)))
         } else {
             lab <- sprintf("%s - %s", lab, lab[1])
         }
@@ -54,21 +64,38 @@ get_hypothesis <- function(x, hypothesis, column, by = NULL) {
         lincom <- lincom[, 2:ncol(lincom), drop = FALSE]
     }
 
+    if (isTRUE(hypothesis == "revsequential")) {
+        lincom <- matrix(0, nrow = nrow(x), ncol = nrow(x) - 1)
+        lab <- get_hypothesis_row_labels(x, by = by)
+        if (length(lab) == 0 || anyDuplicated(lab) > 0) {
+            lab <- sprintf("Row %s - Row %s", seq_len(ncol(lincom)), seq_len(ncol(lincom)) + 1)
+        } else {
+            lab <- sprintf("%s - %s", lab[seq_len(ncol(lincom))], lab[seq_len(ncol(lincom)) + 1])
+        }
+        for (i in seq_len(ncol(lincom))) {
+            lincom[i:(i + 1), i] <- c(1, -1)
+        }
+        colnames(lincom) <- lab
+    }
+
     if (isTRUE(hypothesis == "sequential")) {
         lincom <- matrix(0, nrow = nrow(x), ncol = nrow(x) - 1)
         lab <- get_hypothesis_row_labels(x, by = by)
         if (length(lab) == 0 || anyDuplicated(lab) > 0) {
-            lab <- sprintf("Row %s - Row %s", 1:ncol(lincom) + 1, 1:ncol(lincom))
+            lab <- sprintf("Row %s - Row %s", seq_len(ncol(lincom)) + 1, seq_len(ncol(lincom)))
         } else {
-            lab <- sprintf("%s - %s", lab[1:ncol(lincom) + 1], lab[1:ncol(lincom)])
+            lab <- sprintf("%s - %s", lab[seq_len(ncol(lincom)) + 1], lab[seq_len(ncol(lincom))])
         }
-        for (i in 1:ncol(lincom)) {
+        for (i in seq_len(ncol(lincom))) {
             lincom[i:(i + 1), i] <- c(-1, 1)
         }
         colnames(lincom) <- lab
     }
 
-    if (isTRUE(hypothesis == "pairwise")) {
+    # same order as `emmeans`
+    # in simple contrasts, revpairwise is trivially -1*pairwise, but it is
+    # useful to have this option for interactions
+    if (isTRUE(hypothesis == "revpairwise")) {
         lab_row <- get_hypothesis_row_labels(x, by = by)
         lab_col <- NULL
         flag <- length(lab_row) == 0 || anyDuplicated(lab_row) > 0
@@ -92,12 +119,43 @@ get_hypothesis <- function(x, hypothesis, column, by = NULL) {
         colnames(lincom) <- lab_col
     }
 
+    if (isTRUE(hypothesis == "pairwise")) {
+        lab_row <- get_hypothesis_row_labels(x, by = by)
+        lab_col <- NULL
+        flag <- length(lab_row) == 0 || anyDuplicated(lab_row) > 0
+        mat <- list()
+        for (i in seq_len(nrow(x))) {
+            for (j in 2:nrow(x)) {
+                if (i < j) {
+                    tmp <- matrix(0, nrow = nrow(x), ncol = 1)
+                    tmp[j, ] <- -1
+                    tmp[i, ] <- 1
+                    mat <- c(mat, list(tmp))
+                    if (isTRUE(flag)) {
+                        lab_col <- c(lab_col, sprintf("Row %s - Row %s", i, j))
+                    } else {
+                        lab_col <- c(lab_col, sprintf("%s - %s", lab_row[i], lab_row[j]))
+                    }
+                }
+            }
+        }
+        lincom <- do.call("cbind", mat)
+        colnames(lincom) <- lab_col
+    }
+
     # we assume this is a string formula
     if (is.character(hypothesis) && is.null(lincom)) {
 
-        # row indices: `hypothesis` includes them, but `term` does not
+        # row indices: `hypotheses` includes them, but `term` does not
         if (isTRUE(grepl("\\bb\\d+\\b", hypothesis)) && !any(grepl("\\bb\\d+\\b", x[["term"]]))) {
             lab <- hypothesis
+            bmax <- regmatches(lab, gregexpr("\\bb\\d+\\b", lab))[[1]]
+            bmax <- tryCatch(max(as.numeric(gsub("b", "", bmax))), error = function(e) 0)
+            if (bmax > nrow(x)) {
+                msg <- "%s cannot be used in `hypothesis` because the call produced just %s estimate(s). Try executing the exact same command without the `hypothesis` argument to see which estimates are available for hypothesis testing."
+                msg <- sprintf(msg, paste0("b", bmax), nrow(x))
+                insight::format_error(msg)
+            }
             for (i in seq_len(nrow(x))) {
                 tmp <- paste0("marginaleffects__", i)
                 hypothesis <- gsub(paste0("b", i), tmp, hypothesis)
@@ -107,19 +165,14 @@ get_hypothesis <- function(x, hypothesis, column, by = NULL) {
         # term names
         } else {
             if (!"term" %in% colnames(x) || anyDuplicated(x$term) > 0) {
-                msg <- format_msg(
-                'To use term names in a `hypothesis` string, the same function call without
-                `hypothesis` argument must produce a `term` column with unique row identifiers.
-                You can use `b1`, `b2`, etc. indices instead of term names in the `hypothesis`
-                string Ex: "b1 + b2 = 0" Alternatively, you can use the `newdata`, `variables`,
-                or `by` arguments:
-
-                mod <- lm(mpg ~ am * vs + cyl, data = mtcars)
-                comparisons(mod, newdata = "mean", hypothesis = "b1 = b2")
-                comparisons(mod, newdata = "mean", hypothesis = "am = vs")
-                comparisons(mod, variables = "am", by = "cyl", hypothesis = "pairwise")
-                ')
-                stop(msg, call. = FALSE)
+                msg <- c(
+                'To use term names in a `hypothesis` string, the same function call without `hypothesis` argument must produce a `term` column with unique row identifiers. You can use `b1`, `b2`, etc. indices instead of term names in the `hypotheses` string Ex: "b1 + b2 = 0" Alternatively, you can use the `newdata`, `variables`, or `by` arguments:',
+                "",
+                'mod <- lm(mpg ~ am * vs + cyl, data = mtcars)',
+                'comparisons(mod, newdata = "mean", hypothesis = "b1 = b2")',
+                'comparisons(mod, newdata = "mean", hypothesis = "am = vs")',
+                'comparisons(mod, variables = "am", by = "cyl", hypothesis = "pairwise")')
+                insight::format_error(msg)
             }
             rowlabels <- x$term
         }
@@ -135,6 +188,7 @@ get_hypothesis <- function(x, hypothesis, column, by = NULL) {
 
         draws <- attr(x, "posterior_draws")
         if (!is.null(draws)) {
+            insight::check_if_installed("collapse", minimum_version = "1.9.0")
             tmp <- apply(
                 draws,
                 MARGIN = 2,
@@ -144,11 +198,12 @@ get_hypothesis <- function(x, hypothesis, column, by = NULL) {
             draws <- matrix(tmp, ncol = ncol(draws))
             out <- data.table(
                 term = gsub("\\s+", "", attr(hypothesis, "label")),
-                tmp = apply(draws, 1, median))
+                tmp = collapse::dapply(draws, MARGIN = 1, FUN = collapse::fmedian))
+
 
         } else {
             out <- eval_string_function(
-                x[[column]],
+                x[["estimate"]],
                 hypothesis = hypothesis,
                 rowlabels = rowlabels)
             out <- data.table(
@@ -156,7 +211,7 @@ get_hypothesis <- function(x, hypothesis, column, by = NULL) {
                 tmp = out)
         }
 
-        setnames(out, old = "tmp", new = column)
+        setnames(out, old = "tmp", new = "estimate")
         attr(out, "posterior_draws") <- draws
         return(out)
 
@@ -169,15 +224,15 @@ get_hypothesis <- function(x, hypothesis, column, by = NULL) {
             out <- data.table(
                 term = colnames(lincom),
                 tmp = apply(draws, 1, stats::median))
-            setnames(out, old = "tmp", new = column)
+            setnames(out, old = "tmp", new = "estimate")
             attr(out, "posterior_draws") <- draws
 
         # frequentist
         } else {
             out <- data.table(
                 term = colnames(lincom),
-                tmp = as.vector(x[[column]] %*% lincom))
-            setnames(out, old = "tmp", new = column)
+                tmp = as.vector(x[["estimate"]] %*% lincom))
+            setnames(out, old = "tmp", new = "estimate")
         }
 
         out <- out[out$term != "1 - 1", , drop = FALSE]
@@ -185,7 +240,7 @@ get_hypothesis <- function(x, hypothesis, column, by = NULL) {
     }
 
     msg <- 
-    "`hypothesis` is broken. Please report this bug:
+    "`hypotheses` is broken. Please report this bug:
     https://github.com/vincentarelbundock/marginaleffects/issues."
     stop(msg, call. = FALSE)
 }
@@ -196,12 +251,24 @@ get_hypothesis_row_labels <- function(x, by = NULL) {
     lab <- grep("^term$|^by$|^group$|^value$|^contrast$|^contrast_", colnames(x), value = TRUE)
     lab <- Filter(function(z) length(unique(x[[z]])) > 1, lab)
     if (isTRUE(checkmate::check_character(by))) {
-        lab <- c(lab, by)
+        lab <- unique(c(lab, by))
     }
     if (length(lab) == 0) {
         lab <- NULL
     } else {
-        lab <- apply(data.frame(x)[, lab, drop = FALSE], 1, paste, collapse = ",")
+        lab_df <- data.frame(x)[, lab, drop = FALSE]
+        idx <- vapply(lab_df, FUN = function(x) length(unique(x)) > 1, FUN.VALUE = logical(1))
+        if (sum(idx) > 0) {
+            lab <- apply(lab_df[, idx, drop = FALSE], 1, paste, collapse = ", ")
+        } else {
+            lab <- apply(lab_df, 1, paste, collapse = ", ")
+        }
     }
+
+    # wrap in parentheses to avoid a-b-c-d != (a-b)-(c-d)
+    if (any(grepl("-", lab))) {
+        lab <- sprintf("(%s)", lab)
+    }
+
     return(lab)
 }

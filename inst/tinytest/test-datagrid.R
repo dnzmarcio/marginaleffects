@@ -1,14 +1,15 @@
-source("helpers.R", local = TRUE)
-if (ON_CRAN) exit_file("on cran")
+source("helpers.R")
+using("marginaleffects")
+
 requiet("lme4")
 requiet("fixest")
+
 
 # informative errors
 expect_error(datagrid(Petal.Length = 4.6), pattern = "inside")
 
 # numeric clusters no longer produce a warning; selects mode
-mod <- lmer(mpg ~ hp + (1 + drat | cyl), data = mtcars)
-expect_false(tinytest::expect_warning(datagrid(model = mod)))
+mod <-lme4::lmer(mpg ~ hp + (1 + drat | cyl), data = mtcars)
 expect_true(datagrid(model = mod)$cyl == 8)
 
 # functions
@@ -36,3 +37,83 @@ expect_equivalent(nrow(cmp), 6)
 cmp <- comparisons(mod, newdata = datagrid(am = unique, gear = max))
 expect_equivalent(nrow(cmp), 4)
 
+
+
+# Issue #721
+requiet("haven")
+m <- marginaleffects:::hush(read_dta("http://www.stata-press.com/data/r15/margex.dta"))
+if (inherits(m, "data.frame")) {
+    m <- data.frame(m)
+    m$sex <- as.factor(m$sex)
+    mod <- lm(y ~ sex + age + distance, data = m)
+    expect_error(
+        predictions(mod, newdata = datagrid(sex = c("male", "female"))),
+        pattern = "must be one of the factor levels"
+    )
+    expect_error(
+        predictions(mod, newdata = datagrid(sex = c("male", "femael"))),
+        pattern = "must be one of the factor levels"
+    )
+}
+mod <- lm(mpg ~ qsec + as.factor(gear), data = mtcars)
+expect_error(
+    predictions(mod, newdata = datagrid(gear = 6)),
+    pattern = "must be one of the factor levels"
+)
+expect_error(
+    comparisons(mod, newdata = datagrid(gear = 6)),
+    pattern = "must be one of the factor levels"
+)
+
+
+
+# Issue #688
+dat <<- transform(mtcars, cyl = factor(cyl))
+mod <- lm(mpg ~ hp, data = dat)
+d <- datagrid(model = mod, by = c("carb", "cyl"))
+expect_equivalent(nrow(d), 9)
+
+
+
+# Issue 766: categorical predictors + variables arg + avg
+requiet("Matchit")
+data('lalonde', package='MatchIt')
+fit <- lm(re78 ~ race * treat, data = lalonde)
+
+a = predict(fit, branewdata = lalonde)
+b = predictions(fit, newdata = lalonde)
+expect_equivalent(a, b$estimate)
+
+nd = rbind( transform(lalonde, treat = 0), transform(lalonde, treat = 1)) 
+a = predict(fit, newdata = nd)
+b = predictions(fit, newdata = lalonde, variables = "treat")
+expect_equivalent(a, b$estimate)
+
+a = tapply(predict(fit, newdata = nd), nd$treat, mean)
+b = avg_predictions(fit, newdata = lalonde, variables = "treat")
+expect_equivalent(as.numeric(a), b$estimate)
+
+a = predict(fit, newdata = nd)
+b = predictions(fit, variables = "treat")
+expect_equivalent(a, b$estimate)
+
+a = tapply(predict(fit, newdata = nd), nd$treat, mean)
+b = avg_predictions(fit, variables = "treat")
+expect_equivalent(as.numeric(a), b$estimate)
+
+a = tapply(predict(fit, newdata = nd), nd$treat, mean)
+b = predictions(fit, variables = "treat")
+b = tapply(b$estimate, b$treat, mean)
+expect_equivalent(a, b)
+
+a = as.numeric(tapply(predict(fit, newdata = nd), nd$treat, mean))
+b = predictions(fit, variables = "treat", by = "treat")
+expect_equivalent(a, b$estimate)
+
+
+
+
+
+
+source("helpers.R")
+rm(list = ls())

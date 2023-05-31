@@ -3,9 +3,13 @@
 #' @rdname set_coef
 #' @export
 set_coef.afex_aov <- function(model, coefs, ...) {
-    mat <- matrix(coefs, ncol = ncol(model$lm$coefficients))
-    dimnames(mat) <- dimnames(model$lm$coefficients)
-    model$lm$coefficients <- mat
+    if (isTRUE(checkmate::check_matrix(model$lm$coefficients))) {
+        mat <- matrix(coefs, ncol = ncol(model$lm$coefficients))
+        dimnames(mat) <- dimnames(model$lm$coefficients)
+        model$lm$coefficients <- mat
+    } else {
+        model$lm$coefficients <- coefs
+    }
     return(model)
 }
 
@@ -36,7 +40,7 @@ get_vcov.afex_aov <- function(model, vcov = NULL, ...) {
 #' @export
 get_predict.afex_aov <- function(model, newdata = NULL, ...) {
     out <- stats::predict(model, newdata = newdata)
-    out <- data.frame(predicted = out)
+    out <- data.frame(estimate = out)
     if (isTRUE("rowid" %in% colnames(newdata))) {
         out[["rowid"]] <- newdata[["rowid"]]
     } else {

@@ -8,6 +8,7 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
+options(width = 1000)
 knitr::opts_chunk$set(
   collapse = TRUE,
   fig.width = 6,
@@ -42,16 +43,18 @@ Using the `predictions` function, we set the `hp` variable at its mean and compu
 ```{r}
 p <- predictions(
     mod,
-    newdata = datagrid(am = dat$am, cyl = dat$cyl))
+    newdata = datagrid(am = unique, cyl = unique))
 ```
 
 For illustration purposes, it is useful to reshape the above results:
 
-```{r, echo = FALSE}
-pred <- p %>%
-    select(cyl, am, predicted) %>%
-    pivot_wider(names_from = "am", values_from = "predicted") %>%
-    rowwise() %>%
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+library(tidyverse)
+library(kableExtra)
+pred <- p |>
+    select(cyl, am, estimate) |>
+    pivot_wider(names_from = "am", values_from = "estimate") |>
+    rowwise() |>
     mutate(`Marginal means by cyl` = mean(c(`TRUE`, `FALSE`)))
 row <- data.frame(x = "Marginal means by am",
                   y = mean(pred[["TRUE"]]),
@@ -62,18 +65,32 @@ for (i in 2:ncol(pred)) {
     pred[[i]] <- sprintf("%.1f", pred[[i]])
 }
 pred[pred == "NA"] <- ""
-kbl(pred) %>% 
-    kable_styling() %>%
+kbl(pred) |> 
+    kable_styling() |>
     add_header_above(c(" " = 1, "am" = 2, " " = 1))
 ```
 
-The marginal means by `am` and `cyl` are obtained by taking the mean of the adjusted predictions across cells. The `marginalmeans` function gives us the same results easily:
+The marginal means by `am` and `cyl` are obtained by taking the mean of the adjusted predictions across cells. The `marginal_means` function gives us the same results easily:
 
 ```{r}
-marginalmeans(mod)
+marginal_means(mod)
 ```
 
-The same results can be obtained using the [very powerful `emmeans` package](https://cran.r-project.org/package=emmeans):
+We could obtain the same results with the `by` argument of the `predictions()` function, which allows us to marginalize across some predictors:
+
+```{r}
+predictions(
+    mod,
+    by = "am",
+    newdata = datagrid(am = unique, cyl = unique))
+
+predictions(
+    mod,
+    by = "cyl",
+    newdata = datagrid(am = unique, cyl = unique))
+```
+
+The same results can be achieved using the [powerful `emmeans` package](https://cran.r-project.org/package=emmeans):
 
 ```{r}
 library(emmeans)
@@ -81,9 +98,17 @@ emmeans(mod, specs = "cyl")
 emmeans(mod, specs = "am")
 ```
 
+# Marginal Means vs. Average Predictions
+
+What should scientists report? Marginal means or average predictions? 
+
+Many analysts ask this question, but unfortunately there isn't a single answer. As explained above, marginal means are a special case of predictions, made on a perfectly balanced grid of categorical predictors, with numeric predictors held at their means, and marginalized with respect to some focal variables. Whether the analyst prefers to report this specific type of marginal means or another kind of average prediction will depend on the characteristics of the sample and the population to which they want to generalize.
+
+After reading this vignette and the discussion of `emmeans` in the [Alternative Software vignette](https://vincentarelbundock.github.io/marginaleffects/articles/alternative_software.html), you may want to consult with a statistician to discuss your specific real-world problem and make an informed choice.
+
 # Interactions
 
-By default, the `marginalmeans()` function calculates marginal means for each categorical predictor one after the other. We can also compute marginal means for *combinations* of categories by setting `interaction=TRUE`:
+By default, the `marginal_means()` function calculates marginal means for each categorical predictor one after the other. We can also compute marginal means for *combinations* of categories by setting `cross=TRUE`:
 
 ```{r, message = FALSE, warning = FALSE}
 library(lme4)
@@ -96,10 +121,10 @@ titanic <- glmer(
     data = dat)
 ```
 
-Regardless of the scale of the predictions (`type` argument), `marginalmeans()` always computes standard errors using the Delta Method: 
+Regardless of the scale of the predictions (`type` argument), `marginal_means()` always computes standard errors using the Delta Method: 
 
 ```{r}
-marginalmeans(
+marginal_means(
     titanic,
     type = "response",
     variables = c("Sex", "PClass"))
@@ -108,23 +133,23 @@ marginalmeans(
 When the model is linear or on the link scale, it also produces confidence intervals: 
 
 ```{r}
-marginalmeans(
+marginal_means(
     titanic,
     type = "link",
     variables = c("Sex", "PClass"))
 ```
 
-It is easy to transform those link-scale marginal means with arbitrary functions using the `transform_post` argument:
+It is easy to transform those link-scale marginal means with arbitrary functions using the `transform` argument:
 
 ```{r}
-marginalmeans(
+marginal_means(
     titanic,
     type = "link",
-    transform_post = insight::link_inverse(titanic),
+    transform = insight::link_inverse(titanic),
     variables = c("Sex", "PClass"))
 ```
 
-When a model does not include interactions, `marginalmeans()` defaults to reporting EMMs for each category individually, without interactions:
+`marginal_means()` defaults to reporting EMMs for each category individually, without cross-margins:
 
 ```{r, warning = FALSE, message = FALSE}
 titanic2 <- glmer(
@@ -132,32 +157,43 @@ titanic2 <- glmer(
     family = binomial,
     data = dat)
 
-marginalmeans(
+marginal_means(
     titanic2,
     variables = c("Sex", "PClass"))
 ```
 
-We can force the interactions:
+We can force the cross:
 
 ```{r}
-marginalmeans(
+marginal_means(
     titanic2,
-    interaction = TRUE,
+    cross = TRUE,
     variables = c("Sex", "PClass"))
 ```
 
-# Subgroup analyses with the `by` argument
+# Group averages with the `by` argument
 
-We can compute marginal means within subgroups using the `by` argument:
+We can collapse marginal means via averaging using the `by` argument:
 
 ```{r}
 dat <- mtcars
 dat$am <- factor(dat$am)
 dat$vs <- factor(dat$vs)
 dat$cyl <- factor(dat$cyl)
+
 mod <- glm(gear ~ cyl + vs + am, data = dat, family = poisson)
 
-marginalmeans(mod, by = "am")
+by <- data.frame(
+    by = c("(4 & 6)", "(4 & 6)", "(8)"),
+    cyl = c(4, 6, 8))
+
+marginal_means(mod, by = by, variables = "cyl")
+```
+
+And we can use the `hypothesis` argument to compare those new collapsed subgroups:
+
+```{r}
+marginal_means(mod, by = by, variables = "cyl", hypothesis = "pairwise")
 ```
 
 # Custom Contrasts and Linear Combinations
@@ -169,7 +205,7 @@ See the vignette on [Custom Contrasts and Combinations](https://vincentarelbundo
 The `summary`, `tidy`, and `glance` functions are also available to summarize and manipulate the results:
 
 ```{r}
-mm <- marginalmeans(mod)
+mm <- marginal_means(mod)
 
 tidy(mm)
 
@@ -210,14 +246,50 @@ void <- capture.output({
 Try to compute marginal means, but realize that your grid won’t fit in memory:
 
 ```{r, error = TRUE}
-marginalmeans(mod, type = "probs")
+marginal_means(mod, type = "probs")
 ```
 
 Use the `variables` and `variables_grid` arguments to compute marginal means over a more reasonably sized grid:
 
 ```{r, eval = FALSE}
-marginalmeans(mod,
+marginal_means(mod,
               type = "probs",
               variables = c("x", "V1"),
               variables_grid = paste0("V", 2:3))
+```
+
+
+# Plot conditional marginal means
+
+The `marginaleffects` package offers several functions to plot how some quantities vary as a function of others:
+
+* `plot_predictions`: Conditional adjusted predictions -- how does the predicted outcome change as a function of regressors?
+* `plot_comparisons`: Conditional comparisons -- how do contrasts change as a function of regressors?
+* `plot_slopes`: Conditional marginal effects -- how does the slope change as a function of regressors?
+
+There is no analogous function for marginal means. However, it is very easy to achieve a similar effect using the `predictions()` function, its `by` argument, and standard plotting functions. In the example below, we take these steps:
+
+1. Estimate a model with one continuous (`hp`) and one categorical regressor (`cyl`).
+1. Create a perfectly "balanced" data grid for each combination of `hp` and `cyl`. This is specified by the user in the `datagrid()` call.
+1. Compute fitted values (aka "adjusted predictions") for each cell of the grid.
+1. Use the `by` argument to take the average of predicted values for each value of `hp`, across margins of `cyl`.
+1. Compute standard errors around the averaged predicted values (i.e., marginal means).
+1. Create symmetric confidence intervals in the usual manner.
+1. Plot the results.
+
+```{r}
+library(ggplot2)
+
+mod <- lm(mpg ~ hp + factor(cyl), data = mtcars)
+
+p <- predictions(mod,
+    by = "hp",
+    newdata = datagrid(
+        model = mod,
+        hp = seq(100, 120, length.out = 10),
+        cyl = mtcars$cyl))
+
+ggplot(p) +
+    geom_ribbon(aes(hp, ymin = conf.low, ymax = conf.high), alpha = .2) +
+    geom_line(aes(hp, estimate))
 ```

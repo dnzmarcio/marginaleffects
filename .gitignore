@@ -5,5 +5,7 @@
 .DS_Store
 README.html
 docs
+inst/tinytest/_tinysnapshot_review/
 inst/doc
 marginaleffects.Rproj
+*.code-workspace

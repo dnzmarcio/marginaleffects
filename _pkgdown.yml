@@ -1,24 +1,63 @@
+url: https://vincentarelbundock.github.io/marginaleffects/
+development:
+  mode: auto
 template:
-  params:
-    bootswatch: readable
-  bslib:
-    primary: "#306cc9"
-navbar:
-  title: marginaleffects
-  type: default
-  left:
-  - text: "Adjusted predictions"
-    href: https://vincentarelbundock.github.io/marginaleffects/articles/predictions.html
-  - text: "Marginal effects"
-    href: https://vincentarelbundock.github.io/marginaleffects/articles/marginaleffects.html
-  - text: "Contrasts"
-    href: https://vincentarelbundock.github.io/marginaleffects/articles/contrasts.html
-  - text: "Marginal means"
-    href: https://vincentarelbundock.github.io/marginaleffects/articles/marginalmeans.html
-  - text: "Hypothesis Tests"
-    href: https://vincentarelbundock.github.io/marginaleffects/articles/hypothesis.html
-  right:
-  - text: Functions
-    href: reference/index.html
-  - text: Changelog
-    href: news/index.html
+  bootstrap: 5
+
+articles:
+- title: Core
+  contents:
+    - predictions
+    - comparisons
+    - slopes
+    - marginalmeans
+    - plot
+    - hypothesis
+- title: Case studies
+  contents:
+    - brms
+    - bootstrap
+    - categorical
+    - gformula
+    - elasticity
+    - experiments
+    - gam
+    - logit
+    - lme4
+    - multiple_imputation
+    - python
+- title: Tips and technical notes
+  contents:
+    - alternative_software
+    - extensions
+    - links
+    - performance
+    - uncertainty
+    - supported_models
+    - tables
+    - faq
+
+reference:
+  - title: Estimands and Tests
+    contents:
+    - predictions
+    - comparisons
+    - slopes
+    - marginal_means
+    - hypotheses
+    - avg_predictions
+    - avg_comparisons
+    - avg_slopes
+  - title: Grids
+    contents:
+    - starts_with("datagrid")
+  - title: Plots
+    contents:
+    - plot_predictions
+    - plot_comparisons
+    - plot_slopes
+  - title: Utilities
+    contents:
+    - print.marginaleffects
+    - posterior_draws
+    - starts_with("summary|glance|tidy|inference")

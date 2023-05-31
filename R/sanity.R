@@ -1,17 +1,8 @@
-#' check if dependency is installed
-#'
-#' @noRd
-check_dependency <- function(library_name) {
-  flag <- requireNamespace(library_name, quietly = TRUE)
-  if (!isTRUE(flag)) {
-      msg <- sprintf("Please install the `%s` package.", library_name)
-      return(msg)
-  } else {
-      return(TRUE)
-  }
+sanity_df <- function(df, x) {
+    checkmate::assert(
+        checkmate::check_number(df, lower = 1),
+        checkmate::check_numeric(df, len = nrow(x)))
 }
-assert_dependency <- checkmate::makeAssertionFunction(check_dependency)
-
 
 sanity_wts <- function(wts, newdata) {
     # weights must be available in the `comparisons()` function, NOT in
@@ -48,30 +39,6 @@ sanity_predict_numeric <- function(pred, model, newdata, type) {
         stop(msg, call. = FALSE)
     }
 }
-
-
-sanity_contrast_numeric <- function(contrast_numeric, assertion = TRUE) {
-    flag <- isTRUE(checkmate::check_numeric(contrast_numeric, min.len = 1, max.len = 2)) ||
-            isTRUE(checkmate::check_choice(contrast_numeric, choices = c("iqr", "minmax", "sd", "2sd")))
-    if (isTRUE(assertion) && !isTRUE(flag)) {
-        stop('Contrasts for numeric variables can be a single numeric value, a numeric vector of length 2, or one of the following strings: "iqr", "minmax", "sd", "2sd"', call. = FALSE)
-    } else {
-        return(flag)
-    }
-}
-
-
-sanity_contrast_factor <- function(contrast_factor, assertion = TRUE) {
-    flag <- checkmate::check_choice(
-        contrast_factor,
-        choices = c("reference", "sequential", "pairwise", "all"))
-    if (isTRUE(assertion) && !isTRUE(flag)) {
-        stop('Contrasts for factor or character variables can be: "reference", "sequential", "pairwise", or "all".', call. = FALSE)
-    } else {
-        return(flag)
-    }
-}
-
 
 # OBSOLETE CHECKS KEPT FOR POSTERITY
 

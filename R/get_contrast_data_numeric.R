@@ -1,11 +1,25 @@
 get_contrast_data_numeric <- function(model,
                                       newdata,
                                       variable,
-                                      eps,
+                                      modeldata = NULL,
                                       ...) {
+    
+    h <- variable[["eps"]]
 
+    if (is.null(modeldata)) {
+        modeldata <- get_modeldata(model, additional_variables = FALSE)
+    }
+    if (is.null(modeldata)) {
+        modeldata <- newdata
+    }
 
+    s <- m <- NA
+    if (is.numeric(modeldata[[variable$name]])) {
+        s <- stats::sd(modeldata[[variable$name]], na.rm = TRUE)
+        m <- mean(modeldata[[variable$name]], na.rm = TRUE)
+    }
     x <- newdata[[variable$name]]
+    xmd <- modeldata[[variable$name]]
 
     make_label <- function(lab, val) {
         if (identical(lab, "custom")) return(lab)
@@ -14,10 +28,6 @@ get_contrast_data_numeric <- function(model,
             do.call("sprintf", args),
             error = function(e) lab)
         return(out)
-    }
-
-    if (!is.null(eps)) {
-        newdata$marginaleffects_eps <- eps
     }
 
     # slope
@@ -32,15 +42,27 @@ get_contrast_data_numeric <- function(model,
         "mean(eY/dX)",
         "mean(dY/eX)")
 
-    if (isTRUE(variable$label %in% slopes)) {
+    # manual high
+    if (isTRUE(checkmate::check_data_frame(variable$value))) {
+        if (all(c("low", "high") %in% colnames(variable$value))) {
+            low <- variable$value$low
+            high <- variable$value$high
+        } else {
+            low <- variable$value[[1]]
+            high <- variable$value[[2]]
+        }
+        lab <- "manual"
+
+    } else if (isTRUE(variable$label %in% slopes)) {
+        # low <- x - h / 2
+        # high <- x + h / 2
         low <- x
-        high <- x + eps
+        high <- x + h
         lab <- variable$label
-        newdata$marginaleffects_eps <- eps
 
     } else if (identical(variable$label, "exp(dY/dX)")) {
-        low <- x
-        high <- x + eps
+        low <- x - h / 2
+        high <- x + h / 2
         lab <- "exp(dY/dX)"
 
     # contrast_label is designed for categorical predictors
@@ -48,13 +70,14 @@ get_contrast_data_numeric <- function(model,
     } else if (isTRUE(checkmate::check_numeric(variable$value, len = 1))) {
         low <- x - variable$value / 2
         high <- x + variable$value / 2
-        lab <- make_label("x + %s", variable$value)
         # wrap in parentheses, unless mean() because there are already parentheses
         # important to display ratios of x+1, etc.
+        # label should not be `(mpg+1) - mpg` because that is misleading for centered contrast
         if (!isTRUE(grepl("mean", variable$label))) {
-            lab <- make_label("(%s)", lab)
+            lab <- sprintf("+%s", variable$value)
+        } else {
+            lab <- sprintf("mean(+%s)", variable$value)
         }
-        lab <- make_label(variable$label, c(lab, "x"))
 
     } else if (isTRUE(checkmate::check_numeric(variable$value, len = 2))) {
         variable$value <- sort(variable$value)
@@ -65,8 +88,6 @@ get_contrast_data_numeric <- function(model,
 
     # character contrasts
     } else if (identical(variable$value, "sd")) {
-        m <- mean(x, na.rm = TRUE)
-        s <- stats::sd(x, na.rm = TRUE)
         low <- m - s / 2
         high <- m + s / 2
         lab <- c("x + sd/2", "x - sd/2")
@@ -76,28 +97,30 @@ get_contrast_data_numeric <- function(model,
         lab <- make_label(variable$label, lab)
 
     } else if (identical(variable$value, "2sd")) {
-        m <- mean(x, na.rm = TRUE)
-        s <- stats::sd(x, na.rm = TRUE)
         low <- m - s
         high <- m + s
-        lab <- c("x - sd", "x + sd")
+        lab <- c("x + sd", "x - sd")
         if (!isTRUE(grepl("mean", variable$label))) {
             lab <- sprintf("(%s)", lab)
         }
         lab <- make_label(variable$label, lab)
 
     } else if (identical(variable$value, "iqr")) {
-        low <- stats::quantile(x, probs = .25, na.rm = TRUE)
-        high <- stats::quantile(x, probs = .75, na.rm = TRUE)
+        low <- stats::quantile(xmd, probs = .25, na.rm = TRUE)
+        high <- stats::quantile(xmd, probs = .75, na.rm = TRUE)
         lab <- make_label(variable$label, c("Q3", "Q1"))
 
     } else if (identical(variable$value, "minmax")) {
-        low <- min(x, na.rm = TRUE)
-        high <- max(x, na.rm = TRUE)
+        low <- min(xmd, na.rm = TRUE)
+        high <- max(xmd, na.rm = TRUE)
         lab <- make_label(variable$label, c("Max", "Min"))
-    }
 
-    newdata[["eps"]] <- eps
+    } else if (isTRUE(checkmate::check_function(variable$value))) {
+        tmp <- variable$value(x)
+        low <- tmp[, 1]
+        high <- tmp[, 2]
+        lab <- "custom"
+    }
 
     lo <- hi <- newdata
     lo[[variable$name]] <- low

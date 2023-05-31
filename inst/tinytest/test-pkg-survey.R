@@ -1,5 +1,6 @@
-source("helpers.R", local = TRUE)
-if (ON_CRAN) exit_file("on cran")
+source("helpers.R")
+using("marginaleffects")
+
 requiet("margins")
 requiet("emmeans")
 requiet("broom")
@@ -16,13 +17,17 @@ svyd <- survey::svydesign(
     data = fpc,
     nest = TRUE)
 mod <- survey::svyglm(x ~ nh, design = svyd)
-res <- marginaleffects(mod)
+res <- slopes(mod)
 mar <- suppressMessages(data.frame(margins(mod, unit_ses = TRUE)))
-expect_equivalent(res$dydx, as.numeric(mar$dydx_nh))
+expect_equivalent(res$estimate, as.numeric(mar$dydx_nh))
 expect_equivalent(res$std.error, as.numeric(mar$SE_dydx_nh), tolerance = 0.0001)
 # emtrends
 em <- emtrends(mod, ~nh, "nh", at = list(nh = 4))
 em <- tidy(em)
-mfx <- marginaleffects(mod, type = "link", newdata = data.frame(nh = 4))
-expect_equivalent(mfx$dydx, em$nh.trend, tolerance = .001) # CRAN tolerance
+mfx <- slopes(mod, type = "link", newdata = data.frame(nh = 4))
+expect_equivalent(mfx$estimate, em$nh.trend, tolerance = .001) # CRAN tolerance
 expect_equivalent(mfx$std.error, em$std.error, tolerance = .001)
+
+
+
+rm(list = ls())

@@ -1,6 +1,6 @@
 #' Get a named vector of coefficients from a model object (internal function)
 #' 
-#' @inheritParams marginaleffects
+#' @inheritParams slopes
 #' @return A named vector of coefficients. The names must match those of the variance matrix.
 #' @rdname get_coef
 #' @keywords internal
@@ -16,7 +16,7 @@ get_coef.default <- function(model, ...) {
     # out <-  stats::coef(model)
 
     # more general
-    out <- insight::get_parameters(model)
+    out <- insight::get_parameters(model, component = "all")
     out <- stats::setNames(out$Estimate, out$Parameter)
     return(out)
 }

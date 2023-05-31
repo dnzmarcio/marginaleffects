@@ -2,8 +2,6 @@
 #' @export
 get_predict.biglm <- function(model,
                               newdata = insight::get_data(model),
-                              vcov = FALSE,
-                              conf_level = 0.95,
                               type = "response",
                               ...) {
 
@@ -16,7 +14,7 @@ get_predict.biglm <- function(model,
     out <- as.vector(out)
     out <- data.frame(
         rowid = seq_along(out),
-        predicted = out)
+        estimate = out)
     return(out)
 }
 
@@ -28,14 +26,7 @@ get_vcov.biglm <- function(model,
                            ...) {
 
     if (!isFALSE(vcov)) {
-        msg <- format_msg(
-        "The `vcov` argument is not supported for this model type. Set `vcov=FALSE` to
-        silence this warning, and visit this link to learn why standard errors for this
-        model are not yet supported and how you can help: 
-
-        https://github.com/vincentarelbundock/marginaleffects/issues/387
-        ")
-        warning(msg, call. = FALSE)
+        insight::format_warning(c("The `vcov` argument is not supported for this model type. Set `vcov=FALSE` to silence this warning, and visit this link to learn why standard errors for this model are not yet supported and how you can help:", "https://github.com/vincentarelbundock/marginaleffects/issues/387"))
     }
 
     return(FALSE)

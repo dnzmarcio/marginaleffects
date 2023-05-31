@@ -1,5 +1,6 @@
-source("helpers.R", local = TRUE)
-if (ON_CRAN) exit_file("on cran")
+source("helpers.R")
+using("marginaleffects")
+
 requiet("scam")
 
 # no validity
@@ -12,5 +13,9 @@ f2 <- exp(4 * x2) / (1 + exp(4 * x2)) # monotone increasing smooth
 y <- f1 + f2 + rnorm(n) * .5
 dat <- data.frame(x1 = x1, x2 = x2, y = y)
 mod <- scam(y ~ s(x1, bs = "cr") + s(x2, bs = "mpi"), data = dat)
-suppressWarnings(expect_marginaleffects(mod))
+suppressWarnings(expect_slopes(mod))
 expect_predictions(predictions(mod))
+
+
+
+rm(list = ls())

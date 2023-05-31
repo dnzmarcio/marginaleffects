@@ -1,6 +1,6 @@
 #' Create a data.frame with all factor or character levels
 #'
-#' `model.matrix` and `get_predicted` break when `newdata` includes a factor
+#' `model.matrix` breaks when `newdata` includes a factor
 #' variable, but not all levels are present in the data. This is bad for us
 #' because we often want to get predictions with one (or few) rows, where some
 #' factor levels are inevitably missing.
@@ -30,15 +30,23 @@ complete_levels <- function(x, character_levels = NULL) {
 
     # create padding
     if (length(vault) > 0) {
+        # HACK: Some models use a character variable with many levels (e.g.,
+        # mixed-effects groups). This creates a massive padding dataset, and making
+        # predictions can become very expensive.
+        if (isTRUE(sum(sapply(vault, length)) > 100)) return(data.frame())
+
         padding <- utils::head(x, 1)
-        setDF(padding) # not sure why, but this is needed
+        data.table::setDT(padding)
         for (v in names(vault)) {
             padding[[v]] <- NULL
         }
         fun <- data.table::CJ
         gr <- do.call("fun", vault)
-        padding <- merge(padding, gr, all = TRUE)
-        padding <- padding[, colnames(x)]
+        padding <- cjdt(list(padding, gr))
+        to_keep <- colnames(x)
+        padding[, ..to_keep]
+        setcolorder(padding, to_keep)
+        data.table::setDF(padding)
     } else {
         padding <- data.frame()
     }

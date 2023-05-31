@@ -2,26 +2,51 @@
 #' @export
 get_predict.rq <- function(model,
                            newdata = insight::get_data(model),
-                           vcov = NULL,
-                           conf_level = 0.95,
                            type = NULL,
                            ...) {
-
     # type argument of the method is used to specify confidence interval type
-    # TODO: add support for this in `insight`
-    assert_dependency("quantreg") # predict method must be available
-    out <- quantreg::predict.rq(model,
-                                newdata = newdata,
-                                ...)
-    out <- data.frame(rowid = seq_len(nrow(newdata)),
-                      predicted = out)
+    insight::check_if_installed("quantreg")
+    if (isTRUE(getOption("marginaleffects_linalg", default = "RcppEigen") == "RcppEigen")) {
+        MM <- attr(newdata, "marginaleffects_model_matrix")
+        if (isTRUE(checkmate::check_matrix(MM))) {
+            beta <- get_coef(model)
+            out <- hush(eigenMatMult(MM, beta))
+            if (isTRUE(checkmate::check_numeric(out, len = nrow(newdata)))) {
+                out <- data.frame(rowid = seq_len(nrow(newdata)), estimate = out)
+                return(out)
+            }
+        }
+    }
+    out <- quantreg::predict.rq(model, newdata = newdata, ...)
+    out <- data.frame(rowid = seq_len(nrow(newdata)), estimate = out)
     return(out)
 }
 
 
 #' @include sanity_model.R
-#' @rdname sanity_model_specific
+#' @rdname sanitize_model_specific
 #' @keywords internal
-sanity_model_specific.rqs <- function(model, ...) {
+sanitize_model_specific.rqs <- function(model, ...) {
     stop("`marginaleffects` only supports `quantreg::rq` models with a single `tau` value.", call. = FALSE)
 }
+
+
+
+
+
+# #' @rdname get_model_matrix
+# #' @keywords internal
+# #' @export
+# get_model_matrix.rq <- function(object, newdata) {
+#         tt <- terms(object)
+#         Terms <- delete.response(tt)
+#         m <- model.frame(Terms, newdata, na.action = na.pass, xlev = object$xlevels)
+#         if (!is.null(cl <- attr(Terms, "dataClasses")))
+#             stats::.checkMFClasses(cl, m)
+#         X <- model.matrix(Terms, m, contrasts.arg = object$contrasts)
+#         if (!isTRUE(nrow(X) == nrow(newdata))) {
+#             return(NULL)
+#         } else {
+#             return(X)
+#         }
+# }

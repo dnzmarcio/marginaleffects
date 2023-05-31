@@ -1,16 +1,19 @@
-source("helpers.R", local = TRUE)
-if (ON_CRAN) exit_file("on cran")
+source("helpers.R")
+using("marginaleffects")
+
 requiet("lme4")
 
 # lme4::lmer
-mod <- lmer(mpg ~ hp + (1 | gear), data = mtcars)
-expect_inherits(marginaleffects(mod), "marginaleffects")
-expect_warning(marginaleffects(mod, blah = 2), pattern = "Github")
+mod <-lme4::lmer(mpg ~ hp + (1 | gear), data = mtcars)
+expect_inherits(slopes(mod), "marginaleffects")
+expect_warning(slopes(mod, blah = 2), pattern = "Github")
 
 
 # stats::lm
 mod <- lm(mpg ~ hp, data = mtcars)
-expect_inherits(marginaleffects(mod), "marginaleffects")
-expect_warning(marginaleffects(mod, blah = 2), pattern = "Github")
+expect_inherits(slopes(mod), "marginaleffects")
+expect_warning(slopes(mod, blah = 2), pattern = "Github")
 
 
+
+rm(list = ls())

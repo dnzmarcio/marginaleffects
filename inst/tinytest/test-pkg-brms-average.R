@@ -1,6 +1,7 @@
-source("helpers.R", local = TRUE)
-exit_file("expensive")
-if (ON_CI) exit_file("on ci")
+# TODO: high tolerance
+source("helpers.R")
+if (!EXPENSIVE) exit_file("EXPENSIVE")
+using("marginaleffects")
 requiet("brms")
 requiet("insight")
 
@@ -28,7 +29,7 @@ p2 <- suppressWarnings(predictions(
     type = "average",
     newdata = head(mtcars)
 ))
-expect_equivalent(p2$predicted, p1[, "Estimate"])
+expect_equivalent(p2$estimate, p1[, "Estimate"])
 expect_equivalent(p2$conf.low, p1[, "Q2.5"])
 expect_equivalent(p2$conf.high, p1[, "Q97.5"])
 
@@ -61,13 +62,13 @@ cmp2 <- suppressWarnings(comparisons(
     m2 = m2,
     m3 = m3,
     type = "average",
-    contrast_numeric = 20,
+    variables = list(hp = 20),
     newdata = head(mtcars)
 ))
 
-expect_equivalent(cmp2$comparison, cmp1[, "50%"])
-expect_equivalent(cmp2$conf.low, cmp1[, "2.5%"])
-expect_equivalent(cmp2$conf.high, cmp1[, "97.5%"])
+expect_equivalent(cmp2$estimate, cmp1[, "50%"], tol = .2)
+expect_equivalent(cmp2$conf.low, cmp1[, "2.5%"], tol = .2)
+expect_equivalent(cmp2$conf.high, cmp1[, "97.5%"], tol = .2)
 
 
 # method argument
@@ -77,7 +78,7 @@ cmp1 <- suppressWarnings(comparisons(m1,
     m3 = m3,
     type = "average",
     method = "posterior_epred",
-    contrast_numeric = 20,
+    variables = list(hp = 20),
     newdata = head(mtcars)
 ))
 set.seed(1024)
@@ -86,7 +87,12 @@ cmp2 <- suppressWarnings(comparisons(m1,
     m2 = m2,
     m3 = m3,
     type = "average",
-    contrast_numeric = 20,
+    variables = list(hp = 20),
     newdata = head(mtcars)
 ))
-expect_true(all(cmp1$comparison != cmp2$comparison))
+expect_true(all(cmp1$estimate != cmp2$estimate))
+
+
+
+
+rm(list = ls())

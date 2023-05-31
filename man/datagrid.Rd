@@ -2,19 +2,24 @@
 % Please edit documentation in R/datagrid.R
 \name{datagrid}
 \alias{datagrid}
-\title{Generate a data grid of "typical," "counterfactual," or user-specified values for use in the \code{newdata} argument of the \code{marginaleffects} or \code{predictions} functions.}
+\alias{datagridcf}
+\title{Data grids}
 \usage{
 datagrid(
   ...,
   model = NULL,
   newdata = NULL,
-  grid_type = "typical",
-  FUN_character = Mode,
-  FUN_factor = Mode,
-  FUN_logical = Mode,
+  by = NULL,
+  FUN_character = get_mode,
+  FUN_factor = get_mode,
+  FUN_logical = get_mode,
   FUN_numeric = function(x) mean(x, na.rm = TRUE),
-  FUN_other = function(x) mean(x, na.rm = TRUE)
+  FUN_integer = function(x) round(mean(x, na.rm = TRUE)),
+  FUN_other = function(x) mean(x, na.rm = TRUE),
+  grid_type = "typical"
 )
+
+datagridcf(..., model = NULL, newdata = NULL)
 }
 \arguments{
 \item{...}{named arguments with vectors of values or functions for user-specified variables.
@@ -26,13 +31,9 @@ datagrid(
 
 \item{model}{Model object}
 
-\item{newdata}{data.frame (one and only one of the \code{model} and \code{newdata} arguments}
+\item{newdata}{data.frame (one and only one of the \code{model} and \code{newdata} arguments can be used.)}
 
-\item{grid_type}{character
-\itemize{
-\item "typical": variables whose values are not explicitly specified by the user in \code{...} are set to their mean or mode, or to the output of the functions supplied to \code{FUN_type} arguments.
-\item "counterfactual": the entire dataset is duplicated for each combination of the variable values specified in \code{...}. Variables not explicitly supplied to \code{datagrid()} are set to their observed values in the original dataset.
-}}
+\item{by}{character vector with grouping variables within which \verb{FUN_*} functions are applied to create "sub-grids" with unspecified variables.}
 
 \item{FUN_character}{the function to be applied to character variables.}
 
@@ -42,7 +43,15 @@ datagrid(
 
 \item{FUN_numeric}{the function to be applied to numeric variables.}
 
+\item{FUN_integer}{the function to be applied to integer variables.}
+
 \item{FUN_other}{the function to be applied to other variable types.}
+
+\item{grid_type}{character
+\itemize{
+\item "typical": variables whose values are not explicitly specified by the user in \code{...} are set to their mean or mode, or to the output of the functions supplied to \code{FUN_type} arguments.
+\item "counterfactual": the entire dataset is duplicated for each combination of the variable values specified in \code{...}. Variables not explicitly supplied to \code{datagrid()} are set to their observed values in the original dataset.
+}}
 }
 \value{
 A \code{data.frame} in which each row corresponds to one combination of the named
@@ -50,20 +59,25 @@ predictors supplied by the user via the \code{...} dots. Variables which are not
 explicitly defined are held at their mean or mode.
 }
 \description{
-Generate a data grid of "typical," "counterfactual," or user-specified values for use in the \code{newdata} argument of the \code{marginaleffects} or \code{predictions} functions.
+Generate a data grid of user-specified values for use in the \code{newdata} argument of the \code{predictions()}, \code{comparisons()}, and \code{slopes()} functions. This is useful to define where in the predictor space we want to evaluate the quantities of interest. Ex: the predicted outcome or slope for a 37 year old college graduate.
+\itemize{
+\item \code{datagrid()} generates data frames with combinations of "typical" or user-supplied predictor values.
+\item \code{datagridcf()} generates "counter-factual" data frames, by replicating the entire dataset once for every combination of predictor values supplied by the user.
+}
 }
 \details{
-If \code{datagrid} is used in a \code{marginaleffects} or \code{predictions} call as the
-\code{newdata} argument, the model is automatically inserted in the function
-call, and users do not need to specify either the \code{model} or \code{newdata}
-arguments. Note that only the variables used to fit the models will be
-attached to the results. If a user wants to attach other variables as well
-(e.g., weights or grouping variables), they can supply a data.frame
-explicitly to the \code{newdata} argument inside \code{datagrid()}.
+If \code{datagrid} is used in a \code{predictions()}, \code{comparisons()}, or \code{slopes()} call as the
+\code{newdata} argument, the model is automatically inserted in the \code{model} argument of \code{datagrid()}
+call, and users do not need to specify either the \code{model} or \code{newdata} arguments.
 
 If users supply a model, the data used to fit that model is retrieved using
 the \code{insight::get_data} function.
 }
+\section{Functions}{
+\itemize{
+\item \code{datagridcf()}: Counterfactual data grid
+
+}}
 \examples{
 # The output only has 2 rows, and all the variables except `hp` are at their
 # mean or mode.
@@ -74,9 +88,9 @@ mod <- lm(mpg ~ hp, mtcars)
 datagrid(model = mod, hp = c(100, 110))
 
 # Use in `marginaleffects` to compute "Typical Marginal Effects". When used
-# in `marginaleffects()` or `predictions()` we do not need to specify the
+# in `slopes()` or `predictions()` we do not need to specify the
 #`model` or `newdata` arguments.
-marginaleffects(mod, newdata = datagrid(hp = c(100, 110)))
+slopes(mod, newdata = datagrid(hp = c(100, 110)))
 
 # datagrid accepts functions
 datagrid(hp = range, cyl = unique, newdata = mtcars)

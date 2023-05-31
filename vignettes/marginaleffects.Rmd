@@ -1,343 +1,287 @@
 ---
-title: "Marginal Effects" 
+title: "Get Started"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Marginal Effects}
+  %\VignetteIndexEntry{Get Started}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  fig.width = 6,
-  fig.asp = .4,
-  warning = FALSE,
-  message = FALSE,
-  comment = "#>"
-)
-
-library(marginaleffects)
-library(patchwork)
-library(ggplot2)
-
-theme_set(theme_minimal())
+options(width = 10000)
+okabeito <- c('#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999', '#000000')
+options(ggplot2.discrete.colour = okabeito)
+options(ggplot2.discrete.fill = okabeito)
+url <- "https://raw.githubusercontent.com/vincentarelbundock/marginaleffects/main/data-raw/supported_models.csv"
+dat <- read.csv(url)
+n_support <- nrow(dat)
 ```
 
-# Definition
+# Installation
 
-A "marginal effect" (MFX) is a measure of the association between a change in a regressor, and a change in the response variable. More formally, [the excellent `margins` vignette](https://cran.r-project.org/package=margins) defines the concept as follows:
+Install the latest CRAN release:
 
-> Marginal effects are partial derivatives of the regression equation with respect to each variable in the model for each unit in the data.
-
-Put differently, the marginal effect measures the association between a change in a regressor $x$, and a change in the response $y$. Put differently, differently, the marginal effect is the slope of the prediction function, measured at a specific value of the regressor $x$.
-
-Marginal effects are extremely useful, because they are intuitive and easy to interpret. They are often the main quantity of interest in an empirical analysis. 
-
-In scientific practice, the "Marginal Effect" falls in the same toolbox as the ["Contrast."](https://vincentarelbundock.github.io/marginaleffects/articles/contrasts.html) Both try to answer a counterfactual question: What would happen to $y$ if $x$ were different? They allow us to model the "effect" of a change/difference in the regressor $x$ on the response $y$.^[The term "effect" is itself tricky. To be clear, this vignette does *not* use the word "effect" to imply "causality".] 
-
-To illustrate the concept, consider this quadratic function:
-
-$$y = -x^2$$
-
-From the definition above, we know that the marginal effect is the partial derivative of $y$ with respect to $x$:
-
-$$\frac{\partial y}{\partial x} = -2x$$
-
-To get intuition about how to interpret this quantity, consider the response of $y$ to $x$. It looks like this:
-
-```{r, echo=FALSE}
-x <- seq(-4, 4, .01)
-y <- -x^2 
-dat <- data.frame(x, y)
-ggplot(dat, aes(x, y)) + 
-    geom_line() +
-    labs(y = "Response") +
-    xlim(c(-4, 4)) +
-    ylim(c(-7, 0.5))
+```{r, eval=FALSE}
+install.packages("marginaleffects")
 ```
 
-When $x$ increases, $y$ starts to increase. But then, as $x$ increases further, $y$ creeps back down in negative territory.
+Install the development version:
 
-A marginal effect is the slope of this response function at a certain value of $x$. The next plot adds three tangent lines, highlighting the slopes of the response function for three values of $x$. The slopes of these tangents tell us three things:
-
-1. When $x<0$, the slope is positive: an increase in $x$ is associated with an increase in $y$: The marginal effect is positive.
-2. When $x=0$, the slope is null: a (small) change in $x$ is associated with no change in $y$. The marginal effect is null.
-3. When $x>0$, the slope is negative: an increase in $x$ is associated with a decrease in $y$. The marginal effect is negative.
-
-```{r, echo=FALSE}
-p1 <- ggplot(dat, aes(x, y)) + 
-      xlim(c(-4, 4)) +
-      ylim(c(-7, 0.5)) +
-      labs(y = "Response") +
-      geom_abline(slope = 4, intercept = 4, color = "orange", linetype = "dashed") +
-      geom_abline(slope = 0, intercept = 0, color = "orange", linetype = "dashed") +
-      geom_abline(slope = -4, intercept = 4, color = "orange", linetype = "dashed") +
-      geom_line() +
-      annotate("point", x = -2, y = -4, colour = "orange") +
-      annotate("point", x = 0, y = 0, colour = "orange") +
-      annotate("point", x = 2, y = -4, colour = "orange")
-p1
+```{r, eval=FALSE}
+install.packages(
+    c("marginaleffects", "insight"),
+    repos = c("https://vincentarelbundock.r-universe.dev", "https://easystats.r-universe.dev"))
 ```
 
-Below, we show how to reach the same conclusions in an estimation context, with simulated data and the `marginaleffects` function.
+*Restart `R` completely before moving on.*
 
-# `marginaleffects` function
 
-The marginal effect is a *unit-level* measure of association between changes in a regressor and changes in the response. Except in the simplest linear models, the value of the marginal effect will be different from individual to individual, because it will depend on the values of the other covariates for each individual. 
+# Estimands: Predictions, Comparisons, and Slopes
 
-The `marginaleffects` function thus produces distinct estimates of the marginal effect for each row of the data used to fit the model. The output of `marginaleffects` is a simple `data.frame`, which can be inspected with all the usual `R` commands. 
+The `marginaleffects` package allows `R` users to compute and plot three principal quantities of interest: (1) predictions, (2) comparisons, and (3) slopes. In addition, the package includes a convenience function to compute a fourth estimand, "marginal means", which is a special case of averaged predictions. `marginaleffects` can also average (or "marginalize") unit-level (or "conditional") estimates of all those quantities, and conduct hypothesis tests on them.
 
-To show this, we load the library, download the [Palmer Penguins](https://allisonhorst.github.io/palmerpenguins/) data from the [`Rdatasets` archive](https://vincentarelbundock.github.io/Rdatasets/articles/data.html), and estimate a GLM model:
+[_Predictions_:](articles/predictions.html)
+
+> The outcome predicted by a fitted model on a specified scale for a given combination of values of the predictor variables, such as their observed values, their means, or factor levels. a.k.a. Fitted values, adjusted predictions. `predictions()`, `avg_predictions()`, `plot_predictions()`.
+
+[_Comparisons_:](articles/comparisons.html)
+
+> Compare the predictions made by a model for different regressor values (e.g., college graduates vs. others): contrasts, differences, risk ratios, odds, etc. `comparisons()`, `avg_comparisons()`, `plot_comparisons()`.
+
+[_Slopes_:](https://vincentarelbundock.github.io/marginaleffects/articles/slopes.html) 
+
+> Partial derivative of the regression equation with respect to a regressor of interest. a.k.a. Marginal effects, trends. `slopes()`, `avg_slopes()`, `plot_slopes()`.
+
+[_Marginal Means_:](https://vincentarelbundock.github.io/marginaleffects/articles/marginalmeans.html) 
+
+> Predictions of a model, averaged across a "reference grid" of categorical predictors. `marginalmeans()`.
+
+Predictions, comparisons, and slopes are fundamentally unit-level (or "conditional") quantities. Except in the simplest linear case, estimates will typically vary based on the values of all the regressors in a model. Each of the observations in a dataset is thus associated with its own prediction, comparison, and slope estimates. Below, we will see that it can be useful to marginalize (or "average over") unit-level estimates to report an "average prediction", "average comparison", or "average slope".
+
+One ambiguous aspect of the definitions above is that the word "marginal" comes up in two different and *opposite* ways: 
+
+1. In "marginal effects," we refer to the effect of a tiny (marginal) change in the regressor on the outcome. This is a slope, or derivative. 
+2. In "marginal means," we refer to the process of marginalizing across rows of a prediction grid. This is an average, or integral. 
+
+On this website and in this package, we reserve the expression "marginal effect" to mean a "slope" or "partial derivative".
+
+The `marginaleffects` package includes functions to estimate, average, plot, and summarize all of the estimands described above. The objects produced by `marginaleffects` are "tidy": they produce simple data frames in "long" format. They are also "standards-compliant" and work seamlessly with standard functions like `summary()`, `head()`, `tidy()`, and `glance()`, as well with [external packages like `modelsummary`](https://vincentarelbundock.github.io/modelsummary/) or `ggplot2`.
+
+We now apply `marginaleffects` functions to compute each of the estimands described above. First, we fit a linear regression model with multiplicative interactions:
 
 ```{r}
 library(marginaleffects)
 
-dat <- read.csv("https://vincentarelbundock.github.io/Rdatasets/csv/palmerpenguins/penguins.csv")
-dat$large_penguin <- ifelse(dat$body_mass_g > median(dat$body_mass_g, na.rm = TRUE), 1, 0)
-
-mod <- glm(large_penguin ~ bill_length_mm + flipper_length_mm + species,
-           data = dat, family = binomial)
+mod <- lm(mpg ~ hp * wt * am, data = mtcars)
 ```
+
+Then, we call the `predictions()` function. As noted above, predictions are unit-level estimates, so there is one specific prediction per observation. By default, the `predictions()` function makes one prediction per observation in the dataset that was used to fit the original model. Since `mtcars` has 32 rows, the `predictions()` outcome also has 32 rows:
 
 ```{r}
-mfx <- marginaleffects(mod)
-head(mfx)
+pre <- predictions(mod)
+
+nrow(mtcars)
+
+nrow(pre)
+
+pre
 ```
 
-# The Marginal Effects Zoo
-
-A dataset with one marginal effect estimate per unit of observation is a bit unwieldy and difficult to interpret. There are ways to make this information easier to digest, by computing various quantities of interest. [In a characteristically excellent blog post,](https://www.andrewheiss.com/blog/2022/05/20/marginalia/) Professor Andrew Heiss introduces many such quantities:
-
-* Average Marginal Effects
-* Group-Average Marginal Effects
-* Marginal Effects at User-Specified Values (or Representative Values)
-* Marginal Effects at the Mean
-* Counterfactual Marginal Effects
-* Conditional Marginal Effects
-
-The rest of this vignette defines each of those quantities and explains how to use the `marginaleffects()` and `plot_cme()` functions to compute them. The main differences between these quantities pertain to (a) the regressor values at which we estimate marginal effects, and (b) the way in which unit-level marginal effects are aggregated.
-
-Heiss drew this exceedingly helpful graph which summarizes the information in the rest of this vignette:
-
-```{r, echo = FALSE, out.width = "100%"}
-knitr::include_graphics("https://user-images.githubusercontent.com/987057/169581274-f0d2beb6-0146-453e-91ca-a320c6ef7144.png")
-```
-
-# Average Marginal Effect (AME)
-
-A dataset with one marginal effect estimate per unit of observation is a bit unwieldy and difficult to interpret. Many analysts like to report the "Average Marginal Effect", that is, the average of all the observation-specific marginal effects. These are easy to compute based on the full `data.frame` shown above, but the `summary` function is convenient:
+Now, we use the `comparisons()` function to compute the difference in predicted outcome when each of the predictors is incremented by 1 unit (one predictor at a time, holding all others constant). Once again, comparisons are unit-level quantities. And since there are 3 predictors in the model and our data has 32 rows, we obtain 96 comparisons:
 
 ```{r}
-summary(mfx)
+cmp <- comparisons(mod)
+
+nrow(cmp)
+
+cmp
 ```
 
-Note that since marginal effects are derivatives, they are only properly defined for continuous numeric variables. When the model also includes categorical regressors, the `summary` function will try to display relevant (regression-adjusted) contrasts between different categories, as shown above.
-
-You can also extract average marginal effects using `tidy` and `glance` methods which conform to the [`broom` package specification](https://broom.tidymodels.org/):
+The `comparisons()` function allows customized queries. For example, what happens to the predicted outcome when the `hp` variable increases from 100 to 120?
 
 ```{r}
-tidy(mfx)
-
-glance(mfx)
+comparisons(mod, variables = list(hp = c(120, 100)))
 ```
 
-# Group-Average Marginal Effect (G-AME)
-
-We can also use the `by` argument the average marginal effects *within different subgroups* of the observed data, based on values of the regressors. For example, to compute the average marginal effects of Bill Length for each Species, we do:
+What happens to the predicted outcome when the `wt` variable increases by 1 standard deviation about its mean?
 
 ```{r}
-mfx2 <- marginaleffects(mod, by = "species", variables = "bill_length_mm")
-summary(mfx2)
+comparisons(mod, variables = list(hp = "sd"))
 ```
 
-This is equivalent to manually taking the mean of the observation-level marginal effect for each species sub-group:
+The `comparisons()` function also allows users to specify arbitrary functions of predictions, with the `comparison` argument. For example, what is the average ratio between predicted Miles per Gallon after an increase of 50 units in Horsepower?
 
 ```{r}
-aggregate(dydx ~ species, data = mfx2, FUN = mean)
+comparisons(
+  mod,
+  variables = list(hp = 50),
+  comparison = "ratioavg")
 ```
 
-Note that `marginaleffects` follows `Stata` and the `margins` package in computing standard errors using the group-wise averaged Jacobian.
+See the [Comparisons vignette for detailed explanations and more options.](https://vincentarelbundock.github.io/marginaleffects/articles/comparisons.html)
 
-# Marginal Effect at User-Specified Values
-
-Sometimes, we are not interested in *all* the unit-specific marginal effects, but would rather look at the estimated marginal effects for certain "typical" individuals, or for user-specified values of the regressors. The `datagrid` function helps us build a data grid full of "typical" rows. For example, to generate artificial Adelies and Gentoos with 180mm flippers:
+The `slopes()` function allows us to compute the partial derivative of the outcome equation with respect to each of the predictors. Once again, we obtain a data frame with 96 rows:
 
 ```{r}
-datagrid(flipper_length_mm = 180,
-         species = c("Adelie", "Gentoo"),
-         model = mod)
+mfx <- slopes(mod)
+
+nrow(mfx)
+
+mfx
 ```
 
-The same command can be used (omitting the `model` argument) to `marginaleffects`'s `newdata` argument to compute marginal effects for those (fictional) individuals:
+# Grid
+
+Predictions, comparisons, and slopes are typically "conditional" quantities which depend on the values of all the predictors in the model. By default, `marginaleffects` functions estimate quantities of interest for the empirical distribution of the data (i.e., for each row of the original dataset). However, users can specify the exact values of the predictors they want to investigate by using the `newdata` argument.
+
+`newdata` accepts data frames, shortcut strings, or a call to the `datagrid()` function. For example, to compute the predicted outcome for a hypothetical car with all predictors equal to the sample mean or median, we can do:
 
 ```{r}
-marginaleffects(mod,
-                newdata = datagrid(flipper_length_mm = 180,
-                                   species = c("Adelie", "Gentoo")))
+predictions(mod, newdata = "mean")
+
+predictions(mod, newdata = "median")
 ```
 
-When variables are omitted from the `datagrid` call, they will automatically be set at their median or mode (depending on variable type).
-
-# Marginal Effect at the Mean (MEM)
-
-The "Marginal Effect at the Mean" is a marginal effect calculated for a hypothetical observation where each regressor is set at its mean or mode. By default, the `datagrid` function that we used in the previous section sets all regressors to their means or modes. To calculate the MEM, we can set the `newdata` argument, which determines the values of predictors at which we want to compute marginal effects:
+The [`datagrid` function gives us a powerful way to define a grid of predictors.](https://vincentarelbundock.github.io/marginaleffects/reference/datagrid.html) All the variables not mentioned explicitly in `datagrid()` are fixed to their mean or mode:
 
 ```{r}
-marginaleffects(mod, newdata = "mean")
+predictions(
+  mod,
+  newdata = datagrid(
+    am = c(0, 1),
+    wt = range))
 ```
 
-# Counterfactual Marginal Effects
-
-The `datagrid` function allowed us look at completely fictional individuals. Setting the `grid_type` argument of this function to `"counterfactual"` lets us compute the marginal effects for the actual observations in our dataset, but with a few manipulated values. For example, this code will create a `data.frame` twice as long as the original `dat`, where each observation is repeated with different values of the `flipper_length_mm` variable:
+The same mechanism is available in `comparisons()` and `slopes()`. To estimate the partial derivative of `mpg` with respect to `wt`, when `am` is equal to 0 and 1, while other predictors are held at their means:
 
 ```{r}
-nd <- datagrid(flipper_length_mm = c(160, 180),
-               model = mod,
-               grid_type = "counterfactual")
+slopes(
+  mod,
+  variables = "wt",
+  newdata = datagrid(am = 0:1))
 ```
 
-We see that the rows 1, 2, and 3 of the original dataset have been replicated twice, with different values of the `flipper_length_mm` variable:
+We can also plot how predictions, comparisons, or slopes change across different values of the predictors using [three powerful plotting functions:](https://vincentarelbundock.github.io/marginaleffects/articles/plot.html)
+
+* `plot_predictions`: Conditional Adjusted Predictions
+* `plot_comparisons`: Conditional Comparisons
+* `plot_slopes`: Conditional Marginal Effects
+
+For example, this plot shows the outcomes predicted by our model for different values of the `wt` and `am` variables:
 
 ```{r}
-nd[nd$rowid %in% 1:3,]
+plot_predictions(mod, condition = list("hp", "wt" = "threenum", "am"))
 ```
 
-We can use the observation-level marginal effects to compute average (or median, or anything else) marginal effects over the counterfactual individuals:
-
-```{r, message=FALSE, warning=FALSE}
-library(dplyr)
-
-marginaleffects(mod, newdata = nd) %>%
-    group_by(term) %>%
-    summarize(dydx = median(dydx))
-```
-
-# Conditional Marginal Effects (Plot)
-
-The `plot_cme` function can be used to draw "Conditional Marginal Effects." This is useful when a model includes interaction terms and we want to plot how the marginal effect of a variable changes as the value of a "condition" (or "moderator") variable changes:
-
-```{r, out.width = "60%"}
-mod <- lm(mpg ~ hp * wt + drat, data = mtcars)
-
-plot_cme(mod, effect = "hp", condition = "wt")
-```
-
-The marginal effects in the plot above were computed with values of all regressors -- except the `effect` and the `condition` -- held at their means or modes, depending on variable type.
-
-Since `plot_cme()` produces a `ggplot2` object, it is easy to customize. For example:
+This plot shows how the derivative of `mpg` with respect to `am` varies as a function of `wt` and `hp`:
 
 ```{r}
-plot_cme(mod, effect = "hp", condition = "wt") +
-    geom_rug(aes(x = wt), data = mtcars) +
-    theme_classic()
+plot_slopes(mod, variables = "am", condition = list("hp", "wt" = "minmax"))
 ```
 
-# Example: Quadratic
+See this vignette for more information: [Plots, interactions, predictions, contrasts, and slopes](https://vincentarelbundock.github.io/marginaleffects/articles/plot.html)
 
-In the "Definition" section of this vignette, we considered how marginal effects can be computed analytically in a simple quadratic equation context. We can now use the `marginaleffects` function to replicate our analysis of the quadratic function in a regression application. 
+# Averaging
 
-Say you estimate a linear regression model with a quadratic term:
+Since predictions, comparisons, and slopes are conditional quantities, they can be a bit unwieldy. Often, it can be useful to report a one-number summary instead of one estimate per observation. Instead of presenting "conditional" estimates, some methodologists recommend reporting "marginal" estimates, that is, an average of unit-level estimates. 
 
-$$Y = \beta_0 + \beta_1 X^2 + \varepsilon$$
+(This use of the word "marginal" as "averaging" should not be confused with the term "marginal effect" which, in the econometrics tradition, corresponds to a partial derivative, or the effect of a "small/marginal" change.)
 
-and obtain estimates of $\beta_0=1$ and $\beta_1=2$. Taking the partial derivative with respect to $X$ and plugging in our estimates gives us the marginal effect of $X$ on $Y$:
-
-$$\partial Y / \partial X = \beta_0 + 2 \cdot \beta_1 X$$
-$$\partial Y / \partial X = 1 + 4X$$
-
-This result suggests that the effect of a *change* in $X$ on $Y$ depends on the *level* of $X$. When $X$ is large and positive, an increase in $X$ is associated to a large increase in $Y$. When $X$ is small and positive, an increase in $X$ is associated to a small increase in $Y$. When $X$ is a large negative value, an increase in $X$ is associated with a *decrease* in $Y$.
-
-`marginaleffects` arrives at the same conclusion in simulated data:
-
-```{r, message = FALSE}
-library(tidyverse)
-N <- 1e5
-quad <- data.frame(x = rnorm(N))
-quad$y <- 1 + 1 * quad$x + 2 * quad$x^2 + rnorm(N)
-mod <- lm(y ~ x + I(x^2), quad)
-
-marginaleffects(mod, newdata = datagrid(x = -2:2))  %>%
-    mutate(truth = 1 + 4 * x) %>%
-    select(dydx, truth)
-```
-
-We can plot conditional adjusted predictions with `plot_cap` function:
+To marginalize (average over) our unit-level estimates, we can use the `by` argument or the one of the convenience functions: `avg_predictions()`, `avg_comparisons()`, or `avg_slopes()`. For example, both of these commands give us the same result: the average predicted outcome in the `mtcars` dataset:
 
 ```{r}
-plot_cap(mod, condition = "x")
+avg_predictions(mod)
 ```
 
-We can plot conditional marginal effects with the `plot_cme` function (see section below):
+This is equivalent to manual computation by:
 
 ```{r}
-plot_cme(mod, effect = "x", condition = "x")
+mean(predict(mod))
 ```
 
-Again, the conclusion is the same. When $x<0$, an increase in $x$ is associated with an increase in $y$. When $x=0$, the marginal effect is equal to 0. When $x>0$, an increase in $x$ is associated with a decrease in $y$.
-
-# Prediction types
-
-The `marginaleffect` function takes the derivative of the fitted (or predicted) values of the model, as is typically generated by the `predict(model)` function. By default, `predict` produces predictions on the `"response"` scale, so the marginal effects should be interpreted on that scale. However, users can pass a string or a vector of strings to the `type` argument, and `marginaleffects` will consider different outcomes. 
-
-Typical values include `"response"` and `"link"`, but users should refer to the documentation of the `predict` of the package they used to fit the model to know what values are allowable. documentation. 
+The main `marginaleffects` functions all include a `by` argument, which allows us to marginalize within sub-groups of the data. For example,
 
 ```{r}
-mod <- glm(am ~ mpg, family = binomial, data = mtcars)
-mfx <- marginaleffects(mod, type = "response")
-summary(mfx)
-
-mfx <- marginaleffects(mod, type = "link")
-summary(mfx)
+avg_comparisons(mod, by = "am")
 ```
 
-# Regression tables and coefficient plots
+Marginal Means are a special case of predictions, which are marginalized (or averaged) across a balanced grid of categorical predictors. To illustrate, we estimate a new model with categorical predictors:
 
-Average marginal effects are easy to display in a regression table using packages like `modelsummary`. See [the tables and plots vignette.](https://vincentarelbundock.github.io/marginaleffects/articles/modelsummary.html)
-
-# Supporting new models
-
-In most cases, extending `marginaleffects` to support new models is easy. Imagine you want to add support for an object called `model` of class `EXAMPLE` with N observations. 
-
-#### *Step 1:* Check if `marginaleffects` default functions work:
-
-```r
-# returns a named vector of coefficients
-get_coef(model)
-
-# returns a named vector of predictions 
-# returns a named matrix of size NxK for models with K levels (e.g., multinomial logit)
-get_predict(model)
-
-# returns a named square matrix of size equal to the number of coefficients
-get_vcov(model)
-
-# returns a new model object with different stored coefficients 
-# calling get_predict(model) and get_predict(model_new) should produce different results
-model_new <- set_coef(model, rep(0, length(get_coef(model))))
-predict(model) != predict(model_new)
+```{r}
+dat <- mtcars
+dat$am <- as.logical(dat$am)
+dat$cyl <- as.factor(dat$cyl)
+mod_cat <- lm(mpg ~ am + cyl + hp, data = dat)
 ```
 
-If all of these functions work out-of-the-box, there's a good chance your model will be supported automatically. If they do *not* work, move to...
+We can compute marginal means manually using the functions already described:
 
-#### *Step 2:* Define the missing methods.
-
-Find the class name of your model by calling:
-
-```r
-class(model)
+```{r}
+avg_predictions(
+  mod_cat,
+  newdata = datagrid(cyl = unique, am = unique),
+  by = "am")
 ```
 
-Then, create functions (methods) called `get_coef.EXAMPLE`, `get_predict.EXAMPLE`, `vcov.EXAMPLE`, and `set_coef.EXAMPLE`, with the "EXAMPLE" replaced by the name your model class.
+For convenience, the `marginaleffects` package also includes a `marginal_means()` function:
 
-#### *Step 3:* Add tests
+```{r}
+marginal_means(mod_cat, variables = "am")
+```
 
-Create a file called `tests/testthat/test-PKGNAME.R` and write a few tests. Ideally, we would like to compare the results obtained by `marginaleffects` to an external source, like the `margins` package for `R`, or the `margins` command for `Stata`.
+[The Marginal Means vignette](https://vincentarelbundock.github.io/marginaleffects/articles/marginalmeans.html) offers more detail.
 
-#### *Step 4:* Finalize
+# Hypothesis and equivalence tests
 
-Add your new model class to the lists of supported models in:
+The `hypotheses()` function and the `hypothesis` argument can be used to conduct linear and non-linear hypothesis tests on model coefficients, or on any of the quantities computed by the functions introduced above.
 
-* The `sanity_model` function of the `R/sanity.R` file.
-* The supported models CSV table in `data-raw/supported_models.csv`
-* The "Suggests" list in the `DESCRIPTION` file.
+Consider this model:
+
+```{r}
+mod <- lm(mpg ~ qsec * drat, data = mtcars)
+coef(mod)
+```
+
+Can we reject the null hypothesis that the `drat` coefficient is 2 times the size of the `qsec` coefficient?
+
+```{r}
+hypotheses(mod, "drat = 2 * qsec")
+```
+
+We can ask the same question but refer to parameters by position, with indices `b1`, `b2`, `b3`, etc.:
+
+```{r}
+hypotheses(mod, "b3 = 2 * b2")
+```
+
+The main functions in `marginaleffects` all have a `hypothesis` argument, which means that we can do complex model testing. For example, consider two slope estimates:
+
+```{r}
+slopes(
+  mod,
+  variables = "drat",
+  newdata = datagrid(qsec = range))
+```
+
+Are these two slopes significantly different from one another? To test this, we can use the `hypothesis` argument:
+
+```{r}
+slopes(
+  mod,
+  hypothesis = "b1 = b2",
+  variables = "drat",
+  newdata = datagrid(qsec = range))
+```
+
+Now, imagine that for theoretical (or substantive or clinical) reasons, we only care about slopes larger than 2. We can use the `hypotheses()` function to conduct an equivalence test:
+
+```{r}
+avg_slopes(mod) |> hypotheses(equivalence = c(-2, 2))
+```
+
+See the [Hypothesis Tests and Custom Contrasts vignette](https://vincentarelbundock.github.io/marginaleffects/articles/hypothesis.html) for background, details, and for instructions on how to conduct hypothesis tests in more complex situations.
+
+# More!
+
+There is *much* more you can do with `marginaleffects`. Return to the [Table of Contents](index.html) to read the vignettes, learn how to report marginal effects in [nice tables with the `modelsummary` package](https://vincentarelbundock.github.io/modelsummary/), how to define your own prediction "grid", and much more.
+****

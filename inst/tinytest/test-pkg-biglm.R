@@ -1,4 +1,5 @@
 source("helpers.R")
+using("marginaleffects")
 requiet("biglm")
 
 N <- 1e4
@@ -20,8 +21,13 @@ t1 <- tidy(big_m)
 t2 <- tidy(small_m)
 expect_equivalent(t1$estimate, t2$estimate)
 
-big_m <- marginaleffects(big, type = "link", vcov = FALSE)
-small_m <- marginaleffects(small, type = "link", vcov = FALSE)
+big_m <- slopes(big, type = "link", vcov = FALSE)
+small_m <- slopes(small, type = "link", vcov = FALSE)
 t1 <- tidy(big_m)
 t2 <- tidy(small_m)
 expect_equivalent(t1$estimate, t2$estimate)
+
+
+
+
+rm(list = ls())

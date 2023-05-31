@@ -2,8 +2,6 @@
 #' @export
 get_predict.coxph <- function(model,
                               newdata = insight::get_data(model),
-                              vcov = FALSE,
-                              conf_level = 0.95,
                               type = "lp",
                               ...) {
 
@@ -12,7 +10,7 @@ get_predict.coxph <- function(model,
                           type = type,
                           ...)
 
-    out <- data.frame(rowid = 1:nrow(newdata),
-                      predicted = out)
+    out <- data.frame(rowid = seq_len(nrow(newdata)),
+                      estimate = out)
     return(out)
 }

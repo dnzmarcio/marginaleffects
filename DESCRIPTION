@@ -1,6 +1,6 @@
 Package: marginaleffects
-Title: Marginal Effects, Marginal Means, Predictions, and Contrasts
-Version: 0.7.0.9001
+Title: Predictions, Comparisons, Slopes, Marginal Means, and Hypothesis Tests
+Version: 0.12.0.9008
 Authors@R: 
     c(person(given = "Vincent",
              family = "Arel-Bundock",
@@ -11,8 +11,17 @@ Authors@R:
              family = "Diniz",
              role = "ctb",
              email = "marcio.diniz@cshs.org",
-             comment = c(ORCID = "0000-0002-2427-7843")))
-Description: Compute and plot adjusted predictions, contrasts, marginal effects, and marginal means for over 65 classes of statistical models in R. Conduct linear and non-linear hypothesis tests using the delta method.
+             comment = c(ORCID = "0000-0002-2427-7843")),
+      person(given = "Noah",
+             family = "Greifer",
+             role = "ctb",
+             email = "noah.greifer@gmail.com",
+             comment = c(ORCID = "0000-0003-3067-7154")),
+      person("Etienne", "Bacher",
+             email = "etienne.bacher@protonmail.com",
+             role = "ctb",
+             comment = c(ORCID = "0000-0002-9271-5075")))
+Description: Compute and plot predictions, slopes, marginal means, and comparisons (contrasts, risk ratios, odds, etc.) for over 80 classes of statistical models in R. Conduct linear and non-linear hypothesis tests, or equivalence tests. Calculate uncertainty estimates using the delta method, bootstrapping, or simulation-based inference.
 License: GPL (>= 3)
 Copyright: inst/COPYRIGHTS
 LazyData: true
@@ -20,20 +29,20 @@ Encoding: UTF-8
 URL: https://vincentarelbundock.github.io/marginaleffects/
 BugReports: https://github.com/vincentarelbundock/marginaleffects/issues
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.2.1
-VignetteBuilder: knitr
-Remotes:
-    RobinHankin/Brobdingnag
+RoxygenNote: 7.2.3.9000
 Depends: 
-    R (>= 3.5.0)
+    R (>= 3.6.0)
 Imports: 
     checkmate,
     data.table,
     generics,
-    insight (>= 0.18.0),
-    methods
+    insight (>= 0.19.1),
+    methods,
+    Rcpp (>= 1.0.10)
+LinkingTo: Rcpp, RcppEigen
 Suggests: 
     AER,
+    Amelia,
     afex,
     aod,
     bench,
@@ -41,29 +50,36 @@ Suggests:
     BH,
     bife,
     biglm,
+    blme,
+    boot,
     brglm2,
     brms,
     brmsmargins,
     broom,
+    car,
+    carData,
     collapse,
     conflicted,
     covr,
     crch,
-    datawizard,
+    distributional,
     dplyr,
     emmeans,
+    equivalence,
     estimatr,
-    fixest (>= 0.10.1),
+    fixest,
     future,
-    future.apply,
+    fwb,
     gam,
     gamlss,
+    gamlss.dist,
     geepack,
-    ggbeeswarm,
     ggdag,
     ggdist,
+    ggokabeito,
     ggplot2,
     ggrepel,
+    glmmTMB,
     glmx,
     haven,
     here,
@@ -75,61 +91,78 @@ Suggests:
     lmerTest,
     magrittr,
     margins,
+    MatchIt,
     MASS,
     mclogit,
+    MCMCglmm,
+    missRanger,
     mgcv,
     mhurdle,
     mice,
+    miceadds,
     mlogit,
     modelbased,
     modelsummary,
     nlme,
     nnet,
+    numDeriv,
+    optmatch,
     ordinal,
+    parameters,
     patchwork,
     pkgdown,
+    phylolm,
     plm,
+    polspline,
+    poorman,
+    posterior,
     prediction,
     pscl,
+    purrr,
     quantreg,
-    RcppEigen,
-    rlang,
+    Rchoice,
+    remotes,
     rmarkdown,
     rms,
     robust,
     robustbase,
-    robustlmm,
+    rsample,
     rstanarm,
     rstantools,
+    rsvg,
     sampleSelection,
     sandwich,
     scam,
-    speedglm,
     spelling,
+    speedglm,
     survey,
     survival,
+    svglite,
     systemfonts,
+    tibble,
     tidymodels,
+    tidyr,
     tidyverse,
+    tinysnapshot,
     tinytest,
+    titanic,
     truncreg,
     tsModel,
-    vdiffr,
     withr
 Collate: 
-    'align_J_V.R'
-    'arg_name_change.R'
-    'attributes.R'
+    'RcppExports.R'
     'backtransform.R'
+    'bootstrap_boot.R'
+    'bootstrap_fwb.R'
+    'bootstrap_rsample.R'
+    'broom.R'
+    'by.R'
+    'ci.R'
     'comparisons.R'
     'complete_levels.R'
     'datagrid.R'
-    'deltamethod.R'
-    'deprecate_arg.R'
-    'find_categorical.R'
-    'find_variable_class.R'
-    'format_msg.R'
-    'get_ci.R'
+    'equivalence.R'
+    'get_averages.R'
     'get_coef.R'
     'get_contrast_data.R'
     'get_contrast_data_character.R'
@@ -137,22 +170,29 @@ Collate:
     'get_contrast_data_logical.R'
     'get_contrast_data_numeric.R'
     'get_contrasts.R'
-    'get_eti.R'
     'get_group_names.R'
-    'get_hdi.R'
     'get_hypothesis.R'
     'get_jacobian.R'
+    'get_model_matrix.R'
+    'get_model_matrix_attribute.R'
+    'get_modeldata.R'
     'get_predict.R'
     'get_se_delta.R'
+    'get_term_labels.R'
     'get_vcov.R'
     'github_issue.R'
-    'glance.R'
     'hush.R'
-    'marginaleffects.R'
-    'marginalmeans.R'
+    'hypotheses.R'
+    'hypotheses_joint.R'
+    'imputation.R'
+    'inferences.R'
+    'marginal_means.R'
     'mean_or_mode.R'
+    'methods.R'
     'set_coef.R'
     'methods_MASS.R'
+    'methods_MCMCglmm.R'
+    'methods_Rchoice.R'
     'methods_afex.R'
     'methods_aod.R'
     'methods_betareg.R'
@@ -167,15 +207,19 @@ Collate:
     'methods_gamlss.R'
     'methods_glmmTMB.R'
     'methods_glmx.R'
+    'methods_inferences_simulation.R'
     'methods_lme4.R'
     'methods_mclogit.R'
     'methods_mgcv.R'
     'methods_mhurdle.R'
+    'methods_mlm.R'
     'methods_mlogit.R'
+    'methods_nlme.R'
     'methods_ordinal.R'
     'methods_plm.R'
     'methods_pscl.R'
     'methods_quantreg.R'
+    'methods_rms.R'
     'methods_robustlmm.R'
     'methods_rstanarm.R'
     'methods_sampleSelection.R'
@@ -183,27 +227,35 @@ Collate:
     'methods_stats.R'
     'methods_survival.R'
     'methods_tobit1.R'
+    'modelarchive.R'
     'myTryCatch.R'
     'package.R'
     'plot.R'
-    'plot_cap.R'
-    'plot_cco.R'
-    'plot_cme.R'
-    'posteriordraws.R'
+    'plot_build.R'
+    'plot_comparisons.R'
+    'plot_predictions.R'
+    'plot_slopes.R'
+    'posterior_draws.R'
     'predictions.R'
+    'print.R'
+    'recall.R'
+    'sanitize_comparison.R'
+    'sanitize_condition.R'
     'sanitize_conf_level.R'
     'sanitize_hypothesis.R'
     'sanitize_interaction.R'
     'sanitize_newdata.R'
-    'sanitize_transform_pre.R'
     'sanitize_type.R'
     'sanitize_variables.R'
+    'sanitize_vcov.R'
     'sanity.R'
+    'sanity_by.R'
     'sanity_dots.R'
+    'settings.R'
+    'slopes.R'
     'summary.R'
-    'tidy.R'
+    'tinytest.R'
     'type_dictionary.R'
     'unpack_matrix_cols.R'
-    'utils_cjdt.R'
-    'warn_once.R'
+    'utils.R'
 Language: en-US

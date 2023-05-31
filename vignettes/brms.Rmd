@@ -1,13 +1,14 @@
 ---
-title: "Bayesian analysis with brms"
+title: "Bayesian Analysis with brms"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Bayesian analysis with brms}
+  %\VignetteIndexEntry{Bayesian Analysis with brms}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
 ```{r, include = FALSE}
+options(width = 1000)
 knitr::opts_chunk$set(
   collapse = TRUE,
   fig.width = 9,
@@ -33,13 +34,13 @@ ggplot2::theme_set(theme_clean())
 source("https://raw.githubusercontent.com/vincentarelbundock/marginaleffects/5c38b0b7673d5e992aa80022d1001905c49cc755/inst/tinytest/helpers.R")
 ```
 
-The `marginaleffects` package offers convenience functions to compute and display predictions, contrasts, and marginal effects from bayesian models estimated by the `brms` package. To compute these quantities, `marginaleffects` relies on workshorse functions from the `brms` package to draw from the posterior distribution. The type of draws used is controlled by using the `type` argument of the `predictions` or `marginaleffects` functions:
+The `marginaleffects` package offers convenience functions to compute and display predictions, contrasts, and marginal effects from bayesian models estimated by the `brms` package. To compute these quantities, `marginaleffects` relies on workhorse functions from the `brms` package to draw from the posterior distribution. The type of draws used is controlled by using the `type` argument of the `predictions` or `slopes` functions:
 
 * `type = "response"`: Compute posterior draws of the expected value using the `brms::posterior_epred` function.
 * `type = "link"`: Compute posterior draws of the linear predictor using the `brms::posterior_linpred` function.
 * `type = "prediction"`: Compute posterior draws of the posterior predictive distribution using the `brms::posterior_predict` function.
 
-The `predictions` and `marginaleffects` functions can also pass additional arguments to the `brms` prediction functions via the `...` ellipsis. For example, if `mod` is a mixed-effects model, then this command will compute 10 draws from the posterior predictive distribution, while ignoring all group-level effects:
+The `predictions` and `slopes` functions can also pass additional arguments to the `brms` prediction functions via the `...` ellipsis. For example, if `mod` is a mixed-effects model, then this command will compute 10 draws from the posterior predictive distribution, while ignoring all group-level effects:
 
 ```{r, eval = FALSE}
 predictions(mod, type = "prediction", ndraws = 10, re_formula = NA)
@@ -62,7 +63,6 @@ library(marginaleffects)
 library(brms)
 library(ggplot2)
 library(ggdist)
-library(magrittr)
 
 dat <- read.csv("https://vincentarelbundock.github.io/Rdatasets/csv/carData/TitanicSurvival.csv")
 dat$survived <- ifelse(dat$survived == "yes", 1, 0)
@@ -78,21 +78,20 @@ mod <- brm(survived ~ woman * age + passengerClass,
 ```
 
 ```{r, include = FALSE}
-mod <- download_model("brms_titanic_int")
+mod <- marginaleffects:::modelarchive_model("brms_titanic_int")
 ```
 ## Adjusted predictions
 
 We can compute [adjusted predicted values](https://vincentarelbundock.github.io/marginaleffects/articles/predictions.html) of the outcome variable (i.e., probability of survival aboard the Titanic) using the `predictions` function. By default, this function calculates predictions for each row of the dataset:
 
 ```{r}
-pred <- predictions(mod)
-head(pred)
+predictions(mod)
 ```
 
-To visualize the relationship between the outcome and one of the regressors, we can plot conditional adjusted predictions with the `plot_cap` function:
+To visualize the relationship between the outcome and one of the regressors, we can plot conditional adjusted predictions with the `plot_predictions` function:
 
 ```{r}
-plot_cap(mod, condition = "age")
+plot_predictions(mod, condition = "age")
 ```
 
 Compute adjusted predictions for some user-specified values of the regressors, using the `newdata` argument and the `datagrid` function:
@@ -104,10 +103,10 @@ pred <- predictions(mod,
 pred
 ```
 
-The `posteriordraws` function samples from the posterior distribution of the model, and produces a data frame with `drawid` and `draw` columns.
+The `posterior_draws` function samples from the posterior distribution of the model, and produces a data frame with `drawid` and `draw` columns.
 
 ```{r}
-pred <- posteriordraws(pred)
+pred <- posterior_draws(pred)
 head(pred)
 ```
 
@@ -122,31 +121,33 @@ ggplot(pred, aes(x = draw, fill = factor(woman))) +
 
 ## Marginal effects
 
-Use `marginaleffects()` to [compute marginal effects (slopes of the regression equation)](https://vincentarelbundock.github.io/marginaleffects/articles/marginaleffects.html) for each row of the dataset, and use `summary()` to compute "Average Marginal Effects", that is, the average of all observation-level marginal effects: 
+Use `slopes()` to [compute marginal effects (slopes of the regression equation)](https://vincentarelbundock.github.io/marginaleffects/articles/slopes.html) for each row of the dataset, and use `)` to compute "Average Marginal Effects", that is, the average of all observation-level marginal effects: 
 
 ```{r}
-mfx <- marginaleffects(mod)
-summary(mfx)
+mfx <- slopes(mod)
+mfx
 ```
 
 Compute marginal effects with some regressors fixed at user-specified values, and other regressors held at their means:
 
 ```{r}
-marginaleffects(mod,
-                newdata = datagrid(woman = 1,
-                                   passengerClass = "1st"))
+slopes(
+    mod,
+    newdata = datagrid(
+        woman = 1,
+        passengerClass = "1st"))
 ```
 
 Compute and plot conditional marginal effects:
 
 ```{r}
-plot_cme(mod, effect = "woman", condition = "age")
+plot_slopes(mod, variables = "woman", condition = "age")
 ```
 
-The `posteriordraws` produces a dataset with `drawid` and `draw` columns:
+The `posterior_draws` produces a dataset with `drawid` and `draw` columns:
 
 ```{r}
-draws <- posteriordraws(mfx)
+draws <- posterior_draws(mfx)
 
 dim(draws)
 
@@ -156,10 +157,10 @@ head(draws)
 We can use this dataset to plot our results. For example, to plot the posterior density of the marginal effect of `age` when the `woman` variable is equal to 0 or 1:
 
 ```{r}
-mfx <- marginaleffects(mod,
-                       variables = "age",
-                       newdata = datagrid(woman = 0:1)) |>
-       posteriordraws()
+mfx <- slopes(mod,
+    variables = "age",
+    newdata = datagrid(woman = 0:1)) |>
+    posterior_draws()
 
 ggplot(mfx, aes(x = draw, fill = factor(woman))) +
     stat_halfeye(slab_alpha = .5) +
@@ -170,7 +171,7 @@ ggplot(mfx, aes(x = draw, fill = factor(woman))) +
 
 # Random effects model
 
-This section replicates some of the analyses of a random effects model published in Andrew Heiss' blog post: ["A guide to correctly calculating posterior predictions and average marginal effects with multilievel Bayesian models."](https://www.andrewheiss.com/blog/2021/11/10/ame-bayes-re-guide) The objective is mainly to illustrate the use of `marginaleffects`. Please refer to the original post for a detailed discussion of the quantities computed below.
+This section replicates some of the analyses of a random effects model published in Andrew Heiss' blog post: ["A guide to correctly calculating posterior predictions and average marginal effects with multilevel Bayesian models."](https://www.andrewheiss.com/blog/2021/11/10/ame-bayes-re-guide) The objective is mainly to illustrate the use of `marginaleffects`. Please refer to the original post for a detailed discussion of the quantities computed below.
 
 Load libraries and download data:
 
@@ -197,7 +198,7 @@ mod <- brm(
 ```
 
 ```{r, include = FALSE}
-mod <- download_model("brms_vdem")
+mod <- marginaleffects:::modelarchive_model("brms_vdem")
 ```
 
 ## Posterior predictions
@@ -209,10 +210,12 @@ nd = datagrid(model = mod,
               party_autonomy = c(TRUE, FALSE),
               civil_liberties = .5,
               region = "Middle East and North Africa")
-p1 <- predictions(mod, type = "response", newdata = nd) %>%
-    posteriordraws()
-p2 <- predictions(mod, type = "prediction", newdata = nd) %>%
-    posteriordraws()
+p1 <- predictions(mod, type = "response", newdata = nd) |>
+    posterior_draws() |>
+    transform(type = "Response")
+p2 <- predictions(mod, type = "prediction", newdata = nd) |>
+    posterior_draws() |>
+    transform(type = "Prediction")
 pred <- rbind(p1, p2)
 ```
 
@@ -229,19 +232,19 @@ ggplot(pred, aes(x = draw, fill = party_autonomy)) +
 
 ## Marginal effects and contrasts
 
-As noted in the [Marginal Effects vignette](https://vincentarelbundock.github.io/marginaleffects/articles/marginaleffects.html), there should be one distinct marginal effect for each combination of regressor values. Here, we consider only one combination of regressor values, where `region` is "Middle East and North Africa", and `civil_liberties` is 0.5. Then, we calculate the mean of the posterior distribution of marginal effects:
+As noted in the [Marginal Effects vignette](https://vincentarelbundock.github.io/marginaleffects/articles/slopes.html), there should be one distinct marginal effect for each combination of regressor values. Here, we consider only one combination of regressor values, where `region` is "Middle East and North Africa", and `civil_liberties` is 0.5. Then, we calculate the mean of the posterior distribution of marginal effects:
 
 ```{r}
-mfx <- marginaleffects(mod,
+mfx <- slopes(mod,
                        newdata = datagrid(civil_liberties = .5,
                                           region = "Middle East and North Africa"))
 mfx
 ```
 
-Use the `posteriordraws()` to extract draws from the posterio distribution of marginal effects, and plot them:
+Use the `posterior_draws()` to extract draws from the posterior distribution of marginal effects, and plot them:
 
 ```{r}
-mfx <- posteriordraws(mfx)
+mfx <- posterior_draws(mfx)
 
 ggplot(mfx, aes(x = draw, y = term)) +
   stat_halfeye() +
@@ -251,8 +254,8 @@ ggplot(mfx, aes(x = draw, y = term)) +
 Plot marginal effects, conditional on a regressor:
 
 ```{r, fig.asp = .8}
-plot_cme(mod,
-         effect = "civil_liberties",
+plot_slopes(mod,
+         variables = "civil_liberties",
          condition = "party_autonomy")
 ```
 
@@ -263,7 +266,7 @@ pred <- predictions(mod,
                     newdata = datagrid(party_autonomy = FALSE,
                                        region = "Middle East and North Africa",
                                        civil_liberties = seq(0, 1, by = 0.05))) |>
-        posteriordraws()
+        posterior_draws()
 
 ggplot(pred, aes(x = civil_liberties, y = draw)) +
     stat_lineribbon() +
@@ -276,18 +279,19 @@ ggplot(pred, aes(x = civil_liberties, y = draw)) +
 The slope of this line for different values of civil liberties can be obtained with:
 
 ```{r}
-mfx <- marginaleffects(mod,
-                       newdata = datagrid(civil_liberties = c(.2, .5, .8),
-                                          party_autonomy = FALSE,
-                                          region = "Middle East and North Africa"),
-                       variables = "civil_liberties")
+mfx <- slopes(mod,
+    newdata = datagrid(
+        civil_liberties = c(.2, .5, .8),
+        party_autonomy = FALSE,
+        region = "Middle East and North Africa"),
+    variables = "civil_liberties")
 mfx
 ```
 
 And plotted:
 
 ```{r}
-mfx <- posteriordraws(mfx)
+mfx <- posterior_draws(mfx)
 
 ggplot(mfx, aes(x = draw, fill = factor(civil_liberties))) +
     stat_halfeye(slab_alpha = .5) +
@@ -296,16 +300,18 @@ ggplot(mfx, aes(x = draw, fill = factor(civil_liberties))) +
          fill = "Civil liberties")
 ```
                                  
-The `marginaleffects` function can use the ellipsis (`...`) to push any argument forward to the `posterior_predict` function. This can alter the types of predictions returned. For example, [the `re_formula=NA` argument of the `posterior_predict.brmsfit` method](https://cran.r-project.org/web/packages/brms/brms.pdf) will compute marginaleffects *without* including any group-level effects:
+The `slopes` function can use the ellipsis (`...`) to push any argument forward to the `posterior_predict` function. This can alter the types of predictions returned. For example, [the `re_formula=NA` argument of the `posterior_predict.brmsfit` method](https://cran.r-project.org/web/packages/brms/brms.pdf) will compute marginaleffects *without* including any group-level effects:
 
 ```{r}
-mfx <- marginaleffects(mod,
-                       newdata = datagrid(civil_liberties = c(.2, .5, .8),
-                                          party_autonomy = FALSE,
-                                          region = "Middle East and North Africa"),
-                       variables = "civil_liberties",
-                       re_formula = NA) |>
-       posteriordraws()
+mfx <- slopes(
+    mod,
+    newdata = datagrid(
+        civil_liberties = c(.2, .5, .8),
+        party_autonomy = FALSE,
+        region = "Middle East and North Africa"),
+    variables = "civil_liberties",
+    re_formula = NA) |>
+    posterior_draws()
 
 ggplot(mfx, aes(x = draw, fill = factor(civil_liberties))) +
     stat_halfeye(slab_alpha = .5) +
@@ -328,15 +334,17 @@ emtrends(mod,
 ## Global grand mean
 
 ```{r, fig.width = 9}
-pred <- predictions(mod,
-                    re_formula = NA,
-                    newdata = datagrid(party_autonomy = c(TRUE, FALSE))) |>
-        posteriordraws()
+pred <- predictions(
+    mod,
+    re_formula = NA,
+    newdata = datagrid(party_autonomy = c(TRUE, FALSE))) |>
+    posterior_draws()
 
-mfx <- marginaleffects(mod,
-                       re_formula = NA,
-                       variables = "party_autonomy") |>
-       posteriordraws()
+mfx <- slopes(
+    mod,
+    re_formula = NA,
+    variables = "party_autonomy") |>
+    posterior_draws()
 
 plot1 <- ggplot(pred, aes(x = draw, fill = party_autonomy)) +
          stat_halfeye(slab_alpha = .5) +
@@ -363,7 +371,7 @@ pred <- predictions(mod,
                     newdata = datagrid(region = vdem_2015$region,
                                        party_autonomy = FALSE, 
                                        civil_liberties = seq(0, 1, length.out = 100))) |> 
-        posteriordraws()
+        posterior_draws()
 
 ggplot(pred, aes(x = civil_liberties, y = draw)) +
     stat_lineribbon() +
@@ -381,7 +389,7 @@ pred <- predictions(mod,
                     newdata = datagrid(region = vdem_2015$region,
                                        civil_liberties = c(.2, .8),
                                       party_autonomy = FALSE)) |>
-        posteriordraws()
+        posterior_draws()
 
 ggplot(pred, aes(x = draw, fill = factor(civil_liberties))) +
     stat_halfeye(slab_alpha = .5) +
@@ -398,7 +406,7 @@ pred <- predictions(mod,
                     newdata = datagrid(region = vdem_2015$region,
                                        party_autonomy = c(TRUE, FALSE),
                                        civil_liberties = .5)) |>
-        posteriordraws()
+        posterior_draws()
 
 ggplot(pred, aes(x = draw, y = region , fill = party_autonomy)) +
     stat_halfeye(slab_alpha = .5) +
@@ -410,11 +418,13 @@ ggplot(pred, aes(x = draw, y = region , fill = party_autonomy)) +
 TRUE/FALSE contrasts (marginal effects) of party autonomy by region:
 
 ```{r, fig.asp = .9}
-mfx <- marginaleffects(mod,
-                       variables = "party_autonomy",
-                       newdata = datagrid(region = vdem_2015$region,
-                                          civil_liberties = .5)) |>
-        posteriordraws()
+mfx <- slopes(
+    mod,
+    variables = "party_autonomy",
+    newdata = datagrid(
+        region = vdem_2015$region,
+        civil_liberties = .5)) |>
+    posterior_draws()
 
 ggplot(mfx, aes(x = draw, y = region , fill = party_autonomy)) +
     stat_halfeye(slab_alpha = .5) +
@@ -432,18 +442,89 @@ dat <- data.frame(civil_liberties = .5,
                   party_autonomy = FALSE,
                   region = "New Region")
 
-mfx <- marginaleffects(
+mfx <- slopes(
     mod,
     variables = "party_autonomy",
     allow_new_levels = TRUE,
     newdata = dat)
 
-draws <- posteriordraws(mfx)
+draws <- posterior_draws(mfx)
 
 ggplot(draws, aes(x = draw)) +
      stat_halfeye() +
      labs(x = "Marginal effect of party autonomy in a generic world region", y = "")
 ```
+
+## Averaging, marginalizing, integrating random effects 
+
+Consider a logistic regression model with random effects:
+
+```{r, eval = FALSE}
+dat <- read.csv("https://vincentarelbundock.github.io/Rdatasets/csv/plm/EmplUK.csv")
+dat$x <- as.numeric(dat$output > median(dat$output))
+dat$y <- as.numeric(dat$emp > median(dat$emp))
+mod <- brm(y ~ x + (1 | firm), data = dat, backend = "cmdstanr", family = "bernoulli")
+```
+
+```{r, include = FALSE}
+dat <- read.csv("https://vincentarelbundock.github.io/Rdatasets/csv/plm/EmplUK.csv")
+dat$x <- as.numeric(dat$output > median(dat$output))
+dat$y <- as.numeric(dat$emp > median(dat$emp))
+mod <- marginaleffects:::modelarchive_model("brms_logit_re")
+```
+
+We can compute adjusted predictions for a given value of `x` and for each firm (random effects) as follows:
+
+```{r}
+p <- predictions(mod, newdata = datagrid(x = 0, firm = unique))
+head(p)
+```
+
+We can average/marginalize/integrate across random effects with the `avg_predictions()` function or the `by` argument:
+
+```{r}
+avg_predictions(mod, newdata = datagrid(x = 0, firm = unique))
+
+predictions(mod, newdata = datagrid(x = 0:1, firm = unique), by = "x")
+```
+
+We can also draw from the (assumed gaussian) population distribution of random effects, by asking `predictions()` to make predictions for new "levels" of the random effects. If we then take an average of predictions using `avg_predictions()` or the `by` argument, we will have ["integrated out the random effects", as described in the `brmsmargins` package vignette.](https://joshuawiley.com/brmsmargins/articles/mixed-effects-slopes.html#integrating-out-random-effects) In the code below, we make predictions for 100 firm identifiers which were not in the original dataset. We also ask `predictions()` to push forward the `allow_new_levels` and `sample_new_levels` arguments to the `brms::posterior_epred` function:
+
+```{r}
+predictions(
+    mod,
+    newdata = datagrid(x = 0:1, firm = -1:-100),
+    allow_new_levels = TRUE,
+    sample_new_levels = "gaussian",
+    by = "x")
+```
+
+We can "integrate out" random effects in the other `slopes` functions too. For instance,
+
+```{r}
+avg_comparisons(
+    mod,
+    newdata = datagrid(firm = -1:-100),
+    allow_new_levels = TRUE,
+    sample_new_levels = "gaussian")
+```
+
+This is nearly equivalent the `brmsmargins` command output (with slight variations due to different random seeds):
+
+```{r}
+library(brmsmargins)
+bm <- brmsmargins(
+  k = 100,
+  object = mod,
+  at = data.frame(x = c(0, 1)),
+  CI = .95,
+  CIType = "ETI",
+  contrasts = cbind("AME x" = c(-1, 1)),
+  effects = "integrateoutRE")
+bm$ContrastSummary |> data.frame()
+```
+
+See the [alternative software vignette](https://vincentarelbundock.github.io/marginaleffects/articles/alternative_software.html) for more information on `brmsmargins`.
 
 # Multinomial logit
 
@@ -458,7 +539,9 @@ mod <- brm(depvar ~ ic.gc + oc.gc,
 ```
 
 ```{r, include = FALSE}
-mod <- download_model("brms_heating")
+dat <- "https://vincentarelbundock.github.io/Rdatasets/csv/Ecdat/Heating.csv"
+dat <- read.csv(dat)
+mod <- marginaleffects:::modelarchive_model("brms_heating")
 ```
 
 ## Adjusted predictions
@@ -474,7 +557,7 @@ head(pred)
 Extract posterior draws and plot them:
 
 ```{r}
-draws <- posteriordraws(pred)
+draws <- posterior_draws(pred)
 
 ggplot(draws, aes(x = draw, fill = group)) +
     geom_density(alpha = .2, color = "white") +
@@ -483,10 +566,10 @@ ggplot(draws, aes(x = draw, fill = group)) +
          fill = "Heating system")
 ```
 
-Use the `plot_cap` function to plot conditional adjusted predictions for each level of the outcome variable `gear`, conditional on the value of the `mpg` regressor:
+Use the `plot_predictions` function to plot conditional adjusted predictions for each level of the outcome variable `gear`, conditional on the value of the `mpg` regressor:
 
 ```{r}
-plot_cap(mod, condition = "oc.gc") +
+plot_predictions(mod, condition = "oc.gc") +
     facet_wrap(~ group) +
     labs(y = "Predicted probability")
 ```
@@ -494,8 +577,7 @@ plot_cap(mod, condition = "oc.gc") +
 ## Marginal effects
 
 ```{r}
-mfx <- marginaleffects(mod)
-summary(mfx)
+avg_slopes(mod)
 ```
 
 # Hurdle models
@@ -504,7 +586,7 @@ summary(mfx)
 This section replicates some analyses from [yet another amazing blog post by Andrew Heiss.](https://www.andrewheiss.com/blog/2022/05/09/hurdle-lognormal-gaussian-brms/#emmeans-with-hurdle-models)
 
 To begin, we estimate a hurdle model in `brms` with random effects, using data from the `gapminder` package:
-
+704G
 ```{r, eval = FALSE}
 library(gapminder)
 library(brms)
@@ -557,29 +639,29 @@ gapminder <- mod$data
 Adjusted predictions for every observation in the original data:
 
 ```{r}
-predictions(mod) %>% head()
+predictions(mod) |> head()
 ```
 
 Adjusted predictions for the `hu` parameter:
 
 ```{r}
-predictions(mod, dpar = "hu") %>% head()
+predictions(mod, dpar = "hu") |> head()
 ```
 
 Predictions on a different scale:
 
 ```{r}
-predictions(mod, type = "link", dpar = "hu") %>% head()
+predictions(mod, type = "link", dpar = "hu") |> head()
 ```
 
 Plot adjusted predictions as a function of `lifeExp`:
 
 ```{r}
-plot_cap(
+plot_predictions(
     mod,
     condition = "lifeExp") +
     labs(y = "mu") +
-plot_cap(
+plot_predictions(
     mod,
     dpar = "hu",
     condition = "lifeExp") +
@@ -589,15 +671,15 @@ plot_cap(
 Predictions with more than one condition and the `re_formula` argument from `brms`:
 
 ```{r}
-plot_cap(
+plot_predictions(
     mod,
     re_formula = NULL,
     condition = c("lifeExp", "continent"))
 ```
 
-## Extract draws with `posteriordraws()`
+## Extract draws with `posterior_draws()`
 
-The `posteriordraws()` function extract raw samples from the posterior from objects produced by `marginaleffects`. This allows us to use richer geoms and summaries, such as those in the `ggdist` package:
+The `posterior_draws()` function extract raw samples from the posterior from objects produced by `marginaleffects`. This allows us to use richer geoms and summaries, such as those in the `ggdist` package:
 
 ```{r}
 predictions(
@@ -606,8 +688,8 @@ predictions(
     newdata = datagrid(model = mod,
                        continent = gapminder$continent,
                        year = c(1952, 2007),
-                       lifeExp = seq(30, 80, 1))) %>%
-    posteriordraws() %>%
+                       lifeExp = seq(30, 80, 1))) |>
+    posterior_draws() |>
     ggplot(aes(lifeExp, draw, fill = continent, color = continent)) +
     stat_lineribbon(alpha = .25) +
     facet_grid(year ~ continent)
@@ -618,30 +700,28 @@ predictions(
 What happens to `gdpPercap` when `lifeExp` increases by one?
 
 ```{r}
-comparisons(mod) %>% summary()
+avg_comparisons(mod)
 ```
 What happens to `gdpPercap` when `lifeExp` increases by one standard deviation?
 
 ```{r}
-comparisons(mod, variables = list(lifeExp = "sd")) %>% summary()
+avg_comparisons(mod, variables = list(lifeExp = "sd"))
 ```
 
 What happens to `gdpPercap` when `lifeExp` increases from 50 to 60 and  `year` simultaneously increases its min to its max?
 
 ```{r}
-comparisons(
+avg_comparisons(
     mod,
     variables = list(lifeExp = c(50, 60), year = "minmax"),
-    interaction = TRUE) %>%
-    summary()
+    cross = TRUE)
 ```
 
 Plot draws from the posterior distribution of average contrasts (*not* the same thing as draws from the posterior distribution of contrasts):
 
 ```{r}
-comparisons(mod) %>%
-    summary() %>%
-    posteriordraws() %>%
+avg_comparisons(mod) |>
+    posterior_draws() |>
     ggplot(aes(estimate, term)) +
     stat_dotsinterval() +
     labs(x = "Posterior distribution of average contrasts", y = "")
@@ -652,41 +732,41 @@ comparisons(mod) %>%
 Average Marginal Effect of `lifeExp` on different scales and for different parameters:
 
 ```{r}
-marginaleffects(mod) |> summary()
+avg_slopes(mod)
 
-marginaleffects(mod, type = "link") |> summary()
+avg_slopes(mod, type = "link")
 
-marginaleffects(mod, dpar = "hu") |> summary()
+avg_slopes(mod, dpar = "hu")
 
-marginaleffects(mod, dpar = "hu", type = "link") |> summary()
+avg_slopes(mod, dpar = "hu", type = "link")
 ```
 
 Plot Conditional Marginal Effects
 
 ```{r}
-plot_cme(
+plot_slopes(
     mod,
-    effect = "lifeExp",
+    variables = "lifeExp",
     condition = "lifeExp") +
     labs(y = "mu") +
 
-plot_cme(
+plot_slopes(
     mod,
     dpar = "hu",
-    effect = "lifeExp",
+    variables = "lifeExp",
     condition = "lifeExp") +
     labs(y = "hu")
 ```
 
-Or we can call `marginaleffects()` or `comparisons()` with `posteriordraws()` function to have even more control:
+Or we can call `slopes()` or `comparisons()` with `posterior_draws()` function to have even more control:
 
 ```{r}
 comparisons(
     mod,
     type = "link",
     variables = "lifeExp",
-    newdata = datagrid(lifeExp = c(40, 70), continent = gapminder$continent)) %>%
-    posteriordraws() %>%
+    newdata = datagrid(lifeExp = c(40, 70), continent = gapminder$continent)) |>
+    posterior_draws() |>
     ggplot(aes(draw, continent, fill = continent)) +
     stat_dotsinterval() +
     facet_grid(lifeExp ~ .) +
@@ -697,7 +777,7 @@ comparisons(
 
 For bayesian models like those produced by the `brms` or `rstanarm` packages, the `marginaleffects` package functions report the median of the posterior distribution as their main estimates.
 
-The default credible intervals are equal-tailed intervals (quantiles). Users can customize the type of intervals reported by setting a global option. Currently, the only alternative to ETI is the Highest Density Interval (HDI). Note that, in these two commands, the confidence intervals change slightly, but not the median estimates:
+The default credible intervals are equal-tailed intervals (quantiles), and the default function to identify the center of the distribution is the median. Users can customize the type of intervals reported by setting global options. Note that both the reported estimate and the intervals change slightly:
 
 ```{r}
 library(insight)
@@ -705,9 +785,71 @@ library(marginaleffects)
 
 mod <- insight::download_model("brms_1")
 
-options(marginaleffects_credible_interval = "hdi")
-comparisons(mod) |> summary()
+options(marginaleffects_posterior_interval = "hdi")
+options(marginaleffects_posterior_center = mean)
+avg_comparisons(mod)
 
-options(marginaleffects_credible_interval = "eti")
-comparisons(mod) |> summary()
+options(marginaleffects_posterior_interval = "eti")
+options(marginaleffects_posterior_center = stats::median)
+avg_comparisons(mod)
+```
+
+# Random variables: `posterior` and `ggdist`
+
+Recent versions of the `posterior`, `brms`, and `ggdist` packages make it easy to draw, summarize and plot random variables. The `posterior_draws()` can produce objects of class `rvar` which make it easy to use those features by returning a data frame with a column of type `rvar`:
+
+
+```{r, results = "hide"}
+library(brms)
+library(ggdist)
+library(ggplot2)
+library(marginaleffects)
+mod <- brm(am ~ mpg + hp, data = mtcars, family = bernoulli)
+```
+
+```{r}
+avg_comparisons(mod) |>
+  posterior_draws(shape = "rvar") |>
+  ggplot(aes(y = term, xdist = rvar)) + 
+  stat_slabinterval()
+```
+
+# Non-linear hypothesis testing
+
+```{r, include=FALSE}
+mod <- marginaleffects:::modelarchive_model("brms_numeric2")
+dat <- mtcars
+```
+
+We begin by estimating a model:
+
+```{r}
+#| eval = FALSE
+mod <- brm(am ~ mpg + hp, data = mtcars, family = bernoulli(),
+           seed = 1024, silent = 2, chains = 4, iter = 1000)
+```
+
+Notice that we can compute average contrasts in two different ways, using the `avg_comparisons()` function or the `comparison` argument:
+
+```{r}
+avg_comparisons(mod)
+
+comparisons(mod, comparison = "differenceavg")
+```
+
+Now, we use the `hypothesis` argument to compare the first to the second rows of the `comparisons()` output:
+
+```{r}
+comparisons(
+    mod,
+    comparison = "differenceavg",
+    hypothesis = "b2 - b1 = 0.2")
+```
+
+The `hypotheses` function of the `brms` package can also perform non-linear hypothesis testing, and it generates some convenient statistics and summaries. This function accepts a D-by-P matrix of draws from the posterior distribution, where D is the number of draws and N is the number of parameters. We can obtain such a matrix using the `posterior_draws(x, shape = "DxP")`, and we can simply add a couple calls to our chain of operations: 
+
+```{r}
+avg_comparisons(mod, comparison = "differenceavg") |>
+    posterior_draws(shape = "DxP") |>
+    brms::hypothesis("b2 - b1 > .2")
 ```
